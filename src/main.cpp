@@ -75,11 +75,12 @@ union packed_int {
 } m1, m2, m3;
 
 void setup() {
-  // put your setup code here, to run once:
+  // Switches Init //
   pinMode(SW_Red, INPUT);
   pinMode(SW_Yel, INPUT);
   pinMode(SW_Bla, INPUT);
 
+  // Swerve Dish Init //
   pinMode(prox_1, INPUT);
   pinMode(prox_2, INPUT);
   pinMode(prox_3, INPUT);
@@ -107,16 +108,18 @@ void setup() {
   attachInterrupt(encA3, ENCA3_Read, RISING);
   attachInterrupt(encB3, ENCB3_Read, RISING);
 
+  // PWM Freq and Res Config //
   analogWriteFrequency(PWM_1, 10000);
   analogWriteFrequency(PWM_2, 10000);
   analogWriteFrequency(PWM_3, 10000);
-
   analogWriteResolution(10);
+
   Serial.begin(9600);
   Serial5.begin(115200); //motor 1
   Serial4.begin(115200); //motor 2
   Serial3.begin(115200); //motor 3
 
+  // Homing before start //
   while (digitalRead(SW_Bla) == 1) {
     if (digitalRead(SW_Yel) == 0) {
       spinCCW();
@@ -130,10 +133,9 @@ void setup() {
       break;
     }
   }
-  spin_drive(1, 0);
-  spin_drive(2, 0);
-  spin_drive(3, 0);
+  stopAll2();
 
+  // Start Sub routine (Swerve Dish Position Control) //
   subroutine_posCon1.begin(degAdj1_posCon, 1000);
   subroutine_posCon2.begin(degAdj2_posCon, 1000);
   subroutine_posCon3.begin(degAdj3_posCon, 1000);
