@@ -27,10 +27,13 @@
 #define SW_Yel 11
 #define SW_Bla 12
 
+float degToRad(float val);
+float radToDeg(float val);
 void stopAll2();
 void degAdj1_posCon();
 void degAdj2_posCon();
 void degAdj3_posCon();
+void swerveDrive(float spd, float dir, float omega);
 void spinCCW();
 void homeTheta();
 void stopAll();
@@ -51,9 +54,9 @@ volatile long ENC3_Count = 0;
 float pulsePerDeg = 11.377778;
 
 // PID Variables //
-const float p_kp1 = 8.00f, p_ki1 = 0.1f, p_kd1 = 1.00f;
-const float p_kp2 = 8.00f, p_ki2 = 0.1f, p_kd2 = 1.00f;
-const float p_kp3 = 8.00f, p_ki3 = 0.1f, p_kd3 = 1.00f;
+const float p_kp1 = 8.50f, p_ki1 = 0.1f, p_kd1 = 1.00f; // kp 8.00f
+const float p_kp2 = 7.30f, p_ki2 = 0.04f, p_kd2 = 1.00f;
+const float p_kp3 = 7.50f, p_ki3 = 0.03f, p_kd3 = 1.00f;
 float p_edit1, p_error1 = 0, p_preverror1 = 0, p_p1 = 0, p_i1 = 0, p_d1 = 0;
 float p_edit2, p_error2 = 0, p_preverror2 = 0, p_p2 = 0, p_i2 = 0, p_d2 = 0;
 float p_edit3, p_error3 = 0, p_preverror3 = 0, p_p3 = 0, p_i3 = 0, p_d3 = 0;
@@ -61,6 +64,44 @@ float p_edit3, p_error3 = 0, p_preverror3 = 0, p_p3 = 0, p_i3 = 0, p_d3 = 0;
 volatile int swerve_deg1 = 0;
 volatile int swerve_deg2 = 0;
 volatile int swerve_deg3 = 0;
+
+volatile bool deg1Flag = false;
+volatile bool deg2Flag = false;
+volatile bool deg3Flag = false;
+
+// Swerve Offset and Deg Conversion Variables //
+int swerve_off1 = 1800;
+int swerve_off2 = -1100;
+int swerve_off3 = 400;
+
+int swerve_right1 = -300; //-2400 
+int swerve_right2 = -3200; // -5300
+int swerve_right3 = 2500; // 4600
+
+int marginError = 150;
+
+const float pulseToDegConst = 23.3333;
+void setDegSwerve(int deg1, int deg2, int deg3) {
+  if (deg1 >= 360) {
+    deg1 -= 360;
+  } else if (deg1 <= -360) {
+    deg1 += 360;
+  }
+  if (deg2 >= 360) {
+    deg2 -= 360;
+  } else if (deg2 <= -360) {
+    deg2 += 360;
+  }
+  if (deg3 >= 360) {
+    deg3 -= 360;
+  } else if (deg3 <= -360) {
+    deg3 += 360;
+  }
+
+  swerve_deg1 = swerve_off1 - (deg1 * pulseToDegConst);
+  swerve_deg2 = swerve_off2 - (deg2 * pulseToDegConst);
+  swerve_deg3 = swerve_off3 - (deg3 * pulseToDegConst);
+}
 
 IntervalTimer subroutine_posCon1;
 IntervalTimer subroutine_posCon2;
@@ -140,6 +181,12 @@ void setup() {
   subroutine_posCon2.begin(degAdj2_posCon, 1000);
   subroutine_posCon3.begin(degAdj3_posCon, 1000);
 
+  swerve_deg1 = swerve_off1;
+  swerve_deg2 = swerve_off2;
+  swerve_deg3 = swerve_off3;
+  delay(1000);
+  setDegSwerve(0, 0, 0);
+  delay(3000);
 }
 
 long lasttime1 = 0, lasttime2 = 0, lasttime3 = 0;
@@ -148,43 +195,117 @@ long looptime = 1;
 long lasttime_shit = 0;
 
 void loop() {
+     
+  lasttime_shit = millis();
+  while (millis() - lasttime_shit < 5000) {
+    swerveDrive(50, 0, 0);
+  }
+  stopAll2();
+  delay(1000);
+  lasttime_shit = millis();
+  while (millis() - lasttime_shit < 5000) {
+    swerveDrive(50, 90, 0);
+  }
+  stopAll2();
+  delay(1000);
+  lasttime_shit = millis();
+  while (millis() - lasttime_shit < 5000) {
+    swerveDrive(50, 180, 0);
+  }
+  stopAll2();
+  delay(1000);
+  lasttime_shit = millis();
+  while (millis() - lasttime_shit < 5000) {
+    swerveDrive(50, 270, 0);
+  }
+  stopAll2();
+  delay(1000);
+  // lasttime_shit = millis();
+  // while (millis() - lasttime_shit < 1000) {
+  //   swerve_deg1 = -500;
+  //   swerve_deg2 = -500;
+  //   swerve_deg3 = -500;
+  //   if (millis() - sendSpeedTime > 10)
+  //   {
+  //     sendSpeedTime = millis();
+  //     sendCmd(30, 30, 30);
+  //   }
+  // }
+  // stopAll2();
+}
 
-  lasttime_shit = millis();
-  while (millis() - lasttime_shit < 1000) {
-    swerve_deg1 = 0;
-    swerve_deg2 = 0;
-    swerve_deg3 = 0;
-    if (millis() - sendSpeedTime > 10)
-    {
-      sendSpeedTime = millis();
-      sendCmd(30, 30, 30);
-    }
+void swerveDrive(float spd, float dir, float omega) {
+  float vx,vy;
+  float vx1, vy1, vx2, vy2, vx3, vy3;
+  float vw1, vw2, vw3, thet1, thet2, thet3;
+  vx = spd * cos(degToRad(dir));
+  //vx = spd * cosf(dir * DEG_TO_RAD)
+  vy = spd * sin(degToRad(dir));
+  vx1 = omega + vx;
+  vy1 = vy;
+  vx2 = -omega*sin(degToRad(30)) + vx;
+  vy2 = -omega*sin(degToRad(60)) + vy;
+  vx3 = -omega*sin(degToRad(30)) + vx;
+  vy3 = omega*sin(degToRad(60)) + vy;
+
+  // TODO Contrain shit
+  vw1 = sqrt(pow(vx1, 2) + pow(vy1, 2));
+  vw2 = sqrt(pow(vx2, 2) + pow(vy2, 2));
+  vw3 = -sqrt(pow(vx3, 2) + pow(vy3, 2));
+  if (vw1 > spd) {
+    vw1 = spd;
+  } else if (vw1 < -spd) {
+    vw1 = -spd;
   }
-  stopAll2();
-  lasttime_shit = millis();
-  while (millis() - lasttime_shit < 1000) {
-    swerve_deg1 = -1000;
-    swerve_deg2 = -1000;
-    swerve_deg3 = -1000;
-    if (millis() - sendSpeedTime > 10)
-    {
-      sendSpeedTime = millis();
-      sendCmd(30, 30, 30);
-    }
+
+  if (vw2 > spd) {
+    vw2 = spd;
+  } else if (vw2 < -spd) {
+    vw2 = -spd;
   }
-  stopAll2();
-  lasttime_shit = millis();
-  while (millis() - lasttime_shit < 1000) {
-    swerve_deg1 = -500;
-    swerve_deg2 = -500;
-    swerve_deg3 = -500;
-    if (millis() - sendSpeedTime > 10)
-    {
-      sendSpeedTime = millis();
-      sendCmd(30, 30, 30);
-    }
+
+  if (vw3 > spd) {
+    vw3 = spd;
+  } else if (vw3 < -spd) {
+    vw3 = -spd;
   }
-  stopAll2();
+
+  if ((millis() - sendSpeedTime > 10) && (deg1Flag && deg2Flag && deg3Flag))
+  {
+    sendSpeedTime = millis();
+    sendCmd(vw1, vw2, vw3);
+  } else if (millis() - sendSpeedTime > 10) {
+    sendSpeedTime = millis();
+    sendCmd(0, 0, 0);
+  }
+
+  thet1 = radToDeg(atan2(vx1, vy1));
+  thet2 = radToDeg(atan2(vx2, vy2));
+  thet3 = radToDeg(atan2(vx3, vy3));
+
+  Serial.print(deg1Flag);
+  Serial.print(" ");
+  Serial.print(deg2Flag);
+  Serial.print(" ");
+  Serial.println(deg3Flag);
+
+  setDegSwerve(thet1, thet2, thet3);
+}
+
+float degToRad(float val)
+{
+  // Serial.print(val);
+  // Serial.print(" degRad ");
+  // Serial.println(val * (PI / 180));
+  return val * DEG_TO_RAD;
+}
+
+float radToDeg(float val)
+{
+  // Serial.print(val);
+  // Serial.print(" radDeg ");
+  // Serial.println(val * (180 / PI));
+  return val * RAD_TO_DEG;
 }
 
 void stopAll2() {
@@ -199,13 +320,17 @@ void degAdj1_posCon() {
     if (abs(ENC1_Count - swerve_deg1) > 2)
     {
       p_error1 = swerve_deg1 - ENC1_Count;
+      deg1Flag = false;
     }
     else
     {
       p_error1 = 0;
-      //    p_i = 0;
     }
 
+    if (abs(ENC1_Count - swerve_deg1) < marginError)
+    {
+      deg1Flag = true;
+    }
     p_p1 = p_kp1 * p_error1;
     p_i1 += p_error1;
     p_i1 = constrain(p_i1, -2046, 2046);
@@ -227,11 +352,16 @@ void degAdj2_posCon() {
     if (abs(ENC2_Count - swerve_deg2) > 2)
     {
       p_error2 = swerve_deg2 - ENC2_Count;
+      deg2Flag = false;
     }
     else
     {
       p_error2 = 0;
-      //    p_i = 0;
+    }
+
+    if (abs(ENC2_Count - swerve_deg2) < marginError)
+    {
+      deg2Flag = true;
     }
 
     p_p2 = p_kp2 * p_error2;
@@ -245,6 +375,9 @@ void degAdj2_posCon() {
     } else if (p_edit2 < -1000) {
       p_edit2 = -1000;
     }
+    // Serial.print(0);
+    // Serial.print(" ");
+    // Serial.println(p_error2);
     spin_drive(2, p_edit2);
   }
 }
@@ -255,11 +388,16 @@ void degAdj3_posCon() {
     if (abs(ENC3_Count - swerve_deg3) > 2)
     {
       p_error3 = swerve_deg3 - ENC3_Count;
+      deg3Flag = false;
     }
     else
     {
       p_error3 = 0;
-      //    p_i = 0;
+    }
+
+    if (abs(ENC3_Count - swerve_deg3) < marginError)
+    {
+      deg3Flag = true;
     }
 
     p_p3 = p_kp3 * p_error3;
