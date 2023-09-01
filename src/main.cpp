@@ -289,7 +289,8 @@ void setup()
   setDegSwerve(0, 0, 0);
   // delay(3000);
 
-  while (digitalRead(SW_Red) == 1);
+  while (digitalRead(SW_Red) == 1)
+    ;
   delay(3000);
   //   ;
 
@@ -337,7 +338,6 @@ void setup()
   //   gyro_offset = readGyro();
   //   Serial.println(gyro_offset);
   // }
- 
 }
 
 long lasttime1 = 0, lasttime2 = 0, lasttime3 = 0;
@@ -347,11 +347,11 @@ long lasttime_shit = 0;
 
 void loop()
 {
-  //setDegSwerve(120,120,120);
-  //headingControl(40, 90, 0);
-  // Wait for Gyro Diff
-  // float gyro_deg = readGyro() - gyro_offset;
-  // Serial.println(gyro_deg);
+  // setDegSwerve(120,120,120);
+  // headingControl(40, 90, 0);
+  //  Wait for Gyro Diff
+  //  float gyro_deg = readGyro() - gyro_offset;
+  //  Serial.println(gyro_deg);
 
   lasttime_shit = millis();
   while (millis() - lasttime_shit < 5000)
@@ -440,9 +440,32 @@ void swerveDrive(float spd, float dir, float omega)
     sendCmd(0, 0, 0);
   }
 
-  thet1 = radToDeg(atan2(vy1, vx1));
-  thet2 = radToDeg(atan2(vy2, vx2));
-  thet3 = radToDeg(atan2(vy3, vx3));
+  if (vx1 == 0 && vy1 == 0)
+  {
+    thet1 = 0;
+  }
+  else
+  {
+    thet1 = radToDeg(atan2(vy1, vx1));
+  }
+
+  if (vx2 == 0 && vy2 == 0)
+  {
+    thet2 = 0;
+  }
+  else
+  {
+    thet2 = radToDeg(atan2(vy2, vx2));
+  }
+
+  if (vx3 == 0 && vy3 == 0)
+  {
+    thet3 = 0;
+  }
+  else
+  {
+    thet3 = radToDeg(atan2(vy3, vx3));
+  }
 
   // Serial.print(deg1Flag);
   // Serial.print(" ");
@@ -450,7 +473,7 @@ void swerveDrive(float spd, float dir, float omega)
   // Serial.print(" ");
   // Serial.println(deg3Flag);
 
-  //Serial.println(stopFlag);
+  // Serial.println(stopFlag);
   setDegSwerve(thet1, thet2, thet3);
 }
 
