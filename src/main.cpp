@@ -204,15 +204,6 @@ void setup()
   Fastwire::setup(400, true);
 #endif
 
-  //while (!Serial)
-    ; // wait for Leonardo enumeration, others continue immediately
-
-  // NOTE: 8MHz or slower host processors, like the Teensy @ 3.3v or Ardunio
-  // Pro Mini running at 3.3v, cannot handle this baud rate reliably due to
-  // the baud timing being too misaligned with processor ticks. You must use
-  // 38400 or slower in these cases, or use some kind of external separate
-  // crystal solution for the UART timer.
-
   // initialize device
   Serial.println(F("Initializing I2C devices..."));
   mpu.initialize();
@@ -220,8 +211,6 @@ void setup()
   // verify connection
   Serial.println(F("Testing device connections..."));
   Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
-
-  // Wait gyro Til Program Start //
 
   // Switches Init //
   pinMode(SW_Red, INPUT);
@@ -451,9 +440,9 @@ void swerveDrive(float spd, float dir, float omega)
     sendCmd(0, 0, 0);
   }
 
-  thet1 = radToDeg(atan2(vx1, vy1));
-  thet2 = radToDeg(atan2(vx2, vy2));
-  thet3 = radToDeg(atan2(vx3, vy3));
+  thet1 = radToDeg(atan2(vy1, vx1));
+  thet2 = radToDeg(atan2(vy2, vx2));
+  thet3 = radToDeg(atan2(vy3, vx3));
 
   // Serial.print(deg1Flag);
   // Serial.print(" ");
@@ -467,17 +456,11 @@ void swerveDrive(float spd, float dir, float omega)
 
 float degToRad(float val)
 {
-  // Serial.print(val);
-  // Serial.print(" degRad ");
-  // Serial.println(val * (PI / 180));
   return val * DEG_TO_RAD;
 }
 
 float radToDeg(float val)
 {
-  // Serial.print(val);
-  // Serial.print(" radDeg ");
-  // Serial.println(val * (180 / PI));
   return val * RAD_TO_DEG;
 }
 
