@@ -292,52 +292,52 @@ void setup()
   while (digitalRead(SW_Red) == 1)
     ;
   delay(3000);
-  //   ;
 
   // // Activate Gyro
   // // load and configure the DMP
-  // Serial.println(F("Initializing DMP..."));
-  // devStatus = mpu.dmpInitialize();
+  Serial.println(F("Initializing DMP..."));
+  devStatus = mpu.dmpInitialize();
 
-  // // supply your own gyro offsets here, scaled for min sensitivity
-  // mpu.setXGyroOffset(220);
-  // mpu.setYGyroOffset(76);
-  // mpu.setZGyroOffset(-85);
-  // mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
+  // supply your own gyro offsets here, scaled for min sensitivity
+  mpu.setXGyroOffset(220);
+  mpu.setYGyroOffset(76);
+  mpu.setZGyroOffset(-85);
+  mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
 
-  // // make sure it worked (returns 0 if so)
-  // if (devStatus == 0)
-  // {
-  //   // turn on the DMP, now that it's ready
-  //   Serial.println(F("Enabling DMP..."));
-  //   mpu.setDMPEnabled(true);
+  // make sure it worked (returns 0 if so)
+  if (devStatus == 0)
+  {
+    // turn on the DMP, now that it's ready
+    Serial.println(F("Enabling DMP..."));
+    mpu.setDMPEnabled(true);
 
-  //   // enable Arduino interrupt detection
-  //   Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
-  //   attachInterrupt(13, dmpDataReady, RISING);
-  //   mpuIntStatus = mpu.getIntStatus();
+    // enable Arduino interrupt detection
+    Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
+    attachInterrupt(13, dmpDataReady, RISING);
+    mpuIntStatus = mpu.getIntStatus();
 
-  //   // set our DMP Ready flag so the main loop() function knows it's okay to use it
-  //   Serial.println(F("DMP ready! Waiting for first interrupt..."));
-  //   dmpReady = true;
+    // set our DMP Ready flag so the main loop() function knows it's okay to use it
+    Serial.println(F("DMP ready! Waiting for first interrupt..."));
+    dmpReady = true;
 
-  //   // get expected DMP packet size for later comparison
-  //   packetSize = mpu.dmpGetFIFOPacketSize();
-  // }
-  // else
-  // {
-  //   // ERROR!
-  //   // 1 = initial memory load failed
-  //   // 2 = DMP configuration updates failed
-  //   // (if it's going to break, usually the code will be 1)
-  //   Serial.print(F("DMP Initialization failed (code "));
-  //   Serial.print(devStatus);
-  //   Serial.println(F(")"));
-  // }
-  // while (digitalRead(SW_Bla) == 1) {
-  //   gyro_offset = readGyro();
-  //   Serial.println(gyro_offset);
-  // }
+    // get expected DMP packet size for later comparison
+    packetSize = mpu.dmpGetFIFOPacketSize();
+  }
+  else
+  {
+    // ERROR!
+    // 1 = initial memory load failed
+    // 2 = DMP configuration updates failed
+    // (if it's going to break, usually the code will be 1)
+    Serial.print(F("DMP Initialization failed (code "));
+    Serial.print(devStatus);
+    Serial.println(F(")"));
+  }
+  while (digitalRead(SW_Bla) == 1)
+  {
+    gyro_offset = readGyro();
+    Serial.println(gyro_offset);
+  }
 }
 
 long lasttime1 = 0, lasttime2 = 0, lasttime3 = 0;
@@ -348,37 +348,41 @@ long lasttime_shit = 0;
 void loop()
 {
   // setDegSwerve(120,120,120);
-  // headingControl(40, 90, 0);
+  headingControl(40, 0, 0);
   //  Wait for Gyro Diff
   //  float gyro_deg = readGyro() - gyro_offset;
   //  Serial.println(gyro_deg);
 
-  lasttime_shit = millis();
-  while (millis() - lasttime_shit < 5000)
-  {
-    swerveDrive(30, 90, 40);
-  }
-  stopAll2();
-  delay(1000);
-  lasttime_shit = millis();
-  while (millis() - lasttime_shit < 5000)
-  {
-    swerveDrive(30, 120, 0);
-  }
-  stopAll2();
-  delay(1000);
-  lasttime_shit = millis();
-  while (millis() - lasttime_shit < 5000)
-  {
-    swerveDrive(-30, 45, 0);
-  }
-  stopAll2();
-  delay(1000);
+  // lasttime_shit = millis();
+  // while (millis() - lasttime_shit < 5000)
+  // {
+  //   swerveDrive(30, 0, 30);
+  // }
+  // stopAll2();
+  // delay(1000);
+  // lasttime_shit = millis();
+  // while (millis() - lasttime_shit < 5000)
+  // {
+  //   swerveDrive(30, 0, -30);
+  // }
+  // stopAll2();
+  // delay(1000);
   // lasttime_shit = millis();
   // while (millis() - lasttime_shit < 5000)
   // {
   //   swerveDrive(50, 270, 0);
   // }
+  // stopAll2();
+  // delay(1000);
+}
+
+void moveWithDelay(float spd, float dir, float omega, int duration)
+{
+  lasttime_shit = millis();
+  while (millis() - lasttime_shit < duration)
+  {
+    swerveDrive(spd, dir, omega);
+  }
   // stopAll2();
   // delay(1000);
 }
@@ -467,13 +471,6 @@ void swerveDrive(float spd, float dir, float omega)
     thet3 = radToDeg(atan2(vy3, vx3));
   }
 
-  // Serial.print(deg1Flag);
-  // Serial.print(" ");
-  // Serial.print(deg2Flag);
-  // Serial.print(" ");
-  // Serial.println(deg3Flag);
-
-  // Serial.println(stopFlag);
   setDegSwerve(thet1, thet2, thet3);
 }
 
@@ -492,6 +489,12 @@ void stopAll2()
   spin_drive(1, 0);
   spin_drive(2, 0);
   spin_drive(3, 0);
+  sendSpeedTime = millis();
+  if (millis() - sendSpeedTime > 10)
+  {
+    sendSpeedTime = millis();
+    sendCmd(0, 0, 0);
+  }
 }
 
 void degAdj1_posCon()
@@ -566,9 +569,6 @@ void degAdj2_posCon()
     {
       p_edit2 = -1000;
     }
-    // Serial.print(0);
-    // Serial.print(" ");
-    // Serial.println(p_error2);
     spin_drive(2, p_edit2);
   }
 }
