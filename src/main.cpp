@@ -378,6 +378,11 @@ void loop()
 
 void moveWithDelay(float spd, float dir, float omega, int duration)
 {
+  if (stopFlag) {
+    while (deg1Flag && deg2Flag && deg3Flag) {
+      swerveDrive(spd, dir, omega);
+    }
+  }
   lasttime_shit = millis();
   while (millis() - lasttime_shit < duration)
   {
