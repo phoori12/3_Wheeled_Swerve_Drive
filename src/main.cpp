@@ -88,7 +88,9 @@ void ENCB2_Read();
 void ENCA3_Read();
 void ENCB3_Read();
 void sendCmd(float spd1, float spd2, float spd3);
-void headingControl(int spd, int course, int set_head);
+void headingControl(float spd, float course, float set_head);
+void moveWithDelay(float spd, float dir, float omega, int duration);
+
 
 volatile long ENC1_Count = 0;
 volatile long ENC2_Count = 0;
@@ -196,17 +198,20 @@ union packed_int
 
 void setup()
 {
-// Gyro Init //
-#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+  // Gyro Init //
   Wire.begin();
-  TWBR = 24; // 400kHz I2C clock (200kHz if CPU is 8MHz)
-#elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
-  Fastwire::setup(400, true);
-#endif
+  Wire.setClock(400000);
 
+  Serial.begin(9600);
+  Serial5.begin(115200); // motor 1
+  Serial4.begin(115200); // motor 2
+  Serial3.begin(115200); // motor 3
+
+  // initialize device
   // initialize device
   Serial.println(F("Initializing I2C devices..."));
   mpu.initialize();
+  pinMode(13, INPUT);
 
   // verify connection
   Serial.println(F("Testing device connections..."));
@@ -251,11 +256,6 @@ void setup()
   analogWriteFrequency(PWM_3, 10000);
   analogWriteResolution(10);
 
-  Serial.begin(9600);
-  Serial5.begin(115200); // motor 1
-  Serial4.begin(115200); // motor 2
-  Serial3.begin(115200); // motor 3
-
   // Homing before start //
   while (digitalRead(SW_Bla) == 1)
   {
@@ -293,27 +293,35 @@ void setup()
     ;
   delay(3000);
 
-  // // Activate Gyro
-  // // load and configure the DMP
   Serial.println(F("Initializing DMP..."));
   devStatus = mpu.dmpInitialize();
 
   // supply your own gyro offsets here, scaled for min sensitivity
-  mpu.setXGyroOffset(220);
-  mpu.setYGyroOffset(76);
-  mpu.setZGyroOffset(-85);
-  mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
+  mpu.setXGyroOffset(29);
+  mpu.setYGyroOffset(-25);
+  mpu.setZGyroOffset(58);
+
+  mpu.setXAccelOffset(-5210);
+  mpu.setYAccelOffset(-54);
+  mpu.setZAccelOffset(1738);
 
   // make sure it worked (returns 0 if so)
   if (devStatus == 0)
   {
+    // Calibration Time: generate offsets and calibrate our MPU6050
+    mpu.CalibrateAccel(6);
+    mpu.CalibrateGyro(6);
+    Serial.println();
+    mpu.PrintActiveOffsets();
     // turn on the DMP, now that it's ready
     Serial.println(F("Enabling DMP..."));
     mpu.setDMPEnabled(true);
 
     // enable Arduino interrupt detection
-    Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
-    attachInterrupt(13, dmpDataReady, RISING);
+    Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
+    Serial.print(digitalPinToInterrupt(13));
+    Serial.println(F(")..."));
+    attachInterrupt(digitalPinToInterrupt(13), dmpDataReady, RISING);
     mpuIntStatus = mpu.getIntStatus();
 
     // set our DMP Ready flag so the main loop() function knows it's okay to use it
@@ -348,11 +356,16 @@ long lasttime_shit = 0;
 void loop()
 {
   // setDegSwerve(120,120,120);
-  headingControl(40, 0, 0);
+  // Serial.println(readGyro());
   //  Wait for Gyro Diff
   //  float gyro_deg = readGyro() - gyro_offset;
   //  Serial.println(gyro_deg);
-
+  moveWithDelay(40, 0, 0, 4000);
+  stopAll2();
+  delay(1000);
+  moveWithDelay(40, 180, 0, 4000);
+  stopAll2();
+  delay(1000);
   // lasttime_shit = millis();
   // while (millis() - lasttime_shit < 5000)
   // {
@@ -378,15 +391,17 @@ void loop()
 
 void moveWithDelay(float spd, float dir, float omega, int duration)
 {
-  if (stopFlag) {
-    while (deg1Flag && deg2Flag && deg3Flag) {
-      swerveDrive(spd, dir, omega);
+  if (stopFlag)
+  {
+    while (deg1Flag && deg2Flag && deg3Flag)
+    {
+      headingControl(spd, dir, 0);
     }
   }
   lasttime_shit = millis();
   while (millis() - lasttime_shit < duration)
   {
-    swerveDrive(spd, dir, omega);
+    headingControl(spd, dir, 0);
   }
   // stopAll2();
   // delay(1000);
@@ -398,7 +413,6 @@ void swerveDrive(float spd, float dir, float omega)
   float vx1, vy1, vx2, vy2, vx3, vy3;
   float vw1, vw2, vw3, thet1, thet2, thet3;
   vx = spd * cos(degToRad(dir));
-  // vx = spd * cosf(dir * DEG_TO_RAD)
   vy = spd * sin(degToRad(dir));
   vx1 = omega + vx;
   vy1 = vy;
@@ -850,62 +864,42 @@ void sendCmd(float spd1, float spd2, float spd3)
 float readGyro()
 {
   if (!dmpReady)
-    return 0.00f;
-
-  // wait for MPU interrupt or extra packet(s) available
-  while (!mpuInterrupt && fifoCount < packetSize)
-  {
-    // other program behavior stuff here
-    // .
-    // .
-    // .
-    // if you are really paranoid you can frequently test in between other
-    // stuff to see if mpuInterrupt is true, and if so, "break;" from the
-    // while() loop to immediately process the MPU data
-    // .
-    // .
-    // .
-  }
-
-  // reset interrupt flag and get INT_STATUS byte
-  mpuInterrupt = false;
-  mpuIntStatus = mpu.getIntStatus();
-
-  // get current FIFO count
-  fifoCount = mpu.getFIFOCount();
-
-  // check for overflow (this should never happen unless our code is too inefficient)
-  if ((mpuIntStatus & 0x10) || fifoCount == 1024)
-  {
-    // reset so we can continue cleanly
-    mpu.resetFIFO();
-    Serial.println(F("FIFO overflow!"));
-
-    // otherwise, check for DMP data ready interrupt (this should happen frequently)
-  }
-  else if (mpuIntStatus & 0x02)
-  {
-    // wait for correct available data length, should be a VERY short wait
-    while (fifoCount < packetSize)
-      fifoCount = mpu.getFIFOCount();
-
-    // read a packet from FIFO
-    mpu.getFIFOBytes(fifoBuffer, packetSize);
-
-    // track FIFO count here in case there is > 1 packet available
-    // (this lets us immediately read more without waiting for an interrupt)
-    fifoCount -= packetSize;
-
+    return;
+  // read a packet from FIFO
+  if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer))
+  { // Get the Latest packet
     // display Euler angles in degrees
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-    // Serial.println(ypr[0] * 180 / M_PI);
+    // Serial.print("ypr\t");
     return ypr[0] * 180 / M_PI;
+    // Serial.print(ypr[0] * 180 / M_PI);
+    // Serial.print("\t");
+    // Serial.print(ypr[1] * 180 / M_PI);
+    // Serial.print("\t");
+    // Serial.print(ypr[2] * 180 / M_PI);
+    /*
+      mpu.dmpGetAccel(&aa, fifoBuffer);
+      Serial.print("\tRaw Accl XYZ\t");
+      Serial.print(aa.x);
+      Serial.print("\t");
+      Serial.print(aa.y);
+      Serial.print("\t");
+      Serial.print(aa.z);
+      mpu.dmpGetGyro(&gy, fifoBuffer);
+      Serial.print("\tRaw Gyro XYZ\t");
+      Serial.print(gy.x);
+      Serial.print("\t");
+      Serial.print(gy.y);
+      Serial.print("\t");
+      Serial.print(gy.z);
+    */
+    // Serial.println();
   }
 }
 
-void headingControl(int spd, int course, int set_head)
+void headingControl(float spd, float course, float set_head)
 {
   float gyro_pos = readGyro() - gyro_offset;
   if (abs(gyro_pos) - set_head > gyro_accept)
