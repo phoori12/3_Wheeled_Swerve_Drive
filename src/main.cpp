@@ -149,6 +149,7 @@ const float yCon = 1.00f; // To be tuned //
 long od1_off = 0, od2_off = 0, od3_off = 0;
 volatile long od1_now = 0, od2_now = 0, od3_now = 0; // tends to overflow
 volatile long od1 = 0, od2 = 0, od3 = 0;
+volatile float actual_deg1 = 0, actual_deg2 = 0, actual_deg3 = 0;
 volatile long last_od1 = 0, last_od2 = 0, last_od3 = 0;
 volatile float x_frame, y_frame, x_glob = 0, y_glob = 0;
 
@@ -257,11 +258,11 @@ void setup()
   swerve_deg3 = swerve_off3;
   delay(1000);
   setDegSwerve(0, 0, 0, 0, 0, 0);
-  // delay(3000);
+  delay(3000);
 
   while (digitalRead(SW_Red) == 1)
     ;
-  delay(3000);
+  delay(1000);
 
   Serial.println(F("Initializing DMP..."));
   devStatus = mpu.dmpInitialize();
@@ -323,28 +324,37 @@ uint32_t looptime = 1;
 
 long lasttime_shit = 0;
 
+
+uint32_t localizeTime = 0;
 void loop()
 {
-  lasttime_shit = millis();
-  while (millis() - lasttime_shit < 1000)
-  {
-    if (millis() - sendSpeedTime > 10)
-    {
-      sendSpeedTime = millis();
-      sendCmd(10, 0, 0);
-      Serial.println(x);
-    }
+  stopFlag = true;
+  stopAll2();
+  if (millis() - localizeTime > 10) {
+    localizeTime = millis();
+    getRobotPosition();
   }
-  lasttime_shit = millis();
-  while (millis() - lasttime_shit < 1000)
-  {
-    if (millis() - sendSpeedTime > 10)
-    {
-      sendSpeedTime = millis();
-      sendCmd(-10, 0, 0);
-      Serial.println(x);
-    }
-  }
+  
+  // lasttime_shit = millis();
+  // while (millis() - lasttime_shit < 1000)
+  // {
+  //   if (millis() - sendSpeedTime > 10)
+  //   {
+  //     sendSpeedTime = millis();
+  //     sendCmd(10, 0, 0);
+  //     Serial.println(x);
+  //   }
+  // }
+  // lasttime_shit = millis();
+  // while (millis() - lasttime_shit < 1000)
+  // {
+  //   if (millis() - sendSpeedTime > 10)
+  //   {
+  //     sendSpeedTime = millis();
+  //     sendCmd(-10, 0, 0);
+  //     Serial.println(x);
+  //   }
+  // }
 }
 
 void getRobotPosition()
@@ -353,26 +363,52 @@ void getRobotPosition()
   serialEvent5();
   serialEvent4();
   serialEvent3();
-  // check overflow
+  // check overflow and get motor rotations
   if (abs(last_od1 - od1_now) < 1000000L)
   {
-    od1 = od1_now - last_od1 - od1_off;
+    od1 = od1_now - last_od1 - od1_off; // vw1
   }
 
   if (abs(last_od2 - od2_now) < 1000000L)
   {
-    od2 = od2_now - last_od2 - od2_off;
+    od2 = od2_now - last_od2 - od2_off; // vw2
   }
 
   if (abs(last_od3 - od3_now) < 1000000L)
   {
-    od3 = od3_now - last_od3 - od3_off;
+    od3 = -(od3_now - last_od3 - od3_off); // vw3
   }
   last_od1 = od1_now;
   last_od2 = od2_now;
   last_od3 = od3_now;
-  
-  // Localization Equation
+  // get each Swerve's degree
+  actual_deg1 = (swerve_off1 - swerve_deg1) / DegToPulseConst;
+  actual_deg2 = (swerve_off2 - swerve_deg2) / DegToPulseConst;
+  actual_deg3 = (swerve_off3 - swerve_deg3) / DegToPulseConst;
+
+  // 
+  Serial.print(od1);
+  Serial.print("\t");
+  Serial.print(od2);
+  Serial.print("\t");
+  Serial.print(od3);
+  Serial.print(" || ");
+  Serial.print(actual_deg1);
+  Serial.print("\t");
+  Serial.print(actual_deg2);
+  Serial.print("\t");
+  Serial.println(actual_deg3);
+  // Localization Equation Here 
+
+
+
+
+
+
+
+
+  ///////////////////////////////
+
 }
 
 void moveWithDelay(float spd, float dir, float head, int duration)
@@ -1049,7 +1085,7 @@ void serialEvent3() // m3
     }
     if (_buffer[i - 7] == '#' && _buffer[i] == '\n')
     {
-      od1_now = fromSerial(_buffer);
+      od3_now = fromSerial(_buffer);
     }
     i++;
     if (i > 7)
