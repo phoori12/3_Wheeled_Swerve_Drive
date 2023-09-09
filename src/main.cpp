@@ -77,7 +77,7 @@ void degAdj1_posCon();
 void degAdj2_posCon();
 void degAdj3_posCon();
 void priorityDegPosCon(int deg1, int deg2, int deg3);
-void swerveDrive(float spd, float dir, float omega, bool rotateOnly);
+void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false);
 void setDegSwerve(int deg1, int deg2, int deg3, float v1, float v2, float v3);
 void spinCCW();
 void homeTheta();
@@ -93,6 +93,7 @@ void sendCmd(float spd1, float spd2, float spd3);
 void headingControl(float spd, float course, float set_head);
 void moveWithDelay(float spd, float dir, float omega, int duration);
 void getRobotPosition();
+void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false);
 
 volatile long ENC1_Count = 0;
 volatile long ENC2_Count = 0;
@@ -105,11 +106,10 @@ float pulsePerDeg = 11.377778;
 const float p_kp1 = 8.50f, p_ki1 = 0.1f, p_kd1 = 1.00f; // kp 8.00f
 const float p_kp2 = 7.30f, p_ki2 = 0.04f, p_kd2 = 1.00f;
 const float p_kp3 = 7.50f, p_ki3 = 0.03f, p_kd3 = 1.00f;
-const float h_kp = 2.50f, h_ki = 0.00f, h_kd = 1.00f;
+
 float p_edit1, p_error1 = 0, p_preverror1 = 0, p_p1 = 0, p_i1 = 0, p_d1 = 0;
 float p_edit2, p_error2 = 0, p_preverror2 = 0, p_p2 = 0, p_i2 = 0, p_d2 = 0;
 float p_edit3, p_error3 = 0, p_preverror3 = 0, p_p3 = 0, p_i3 = 0, p_d3 = 0;
-float h_edit, h_error = 0, h_preverror = 0, h_p = 0, h_i = 0, h_d = 0;
 
 volatile int swerve_deg1 = 0;
 volatile int swerve_deg2 = 0;
@@ -144,14 +144,26 @@ uint32_t readCountTime;
 uint32_t sendSpeedTime;
 
 // Localization Variables //
-const float xCon = 1.00f; // To be tuned //
-const float yCon = 1.00f; // To be tuned //
+const float xCon = 0.0000484f; // To be tuned //
+const float yCon = 0.0000469f; // To be tuned //
 long od1_off = 0, od2_off = 0, od3_off = 0;
 volatile long od1_now = 0, od2_now = 0, od3_now = 0; // tends to overflow
 volatile long od1 = 0, od2 = 0, od3 = 0;
 volatile float actual_deg1 = 0, actual_deg2 = 0, actual_deg3 = 0;
 volatile long last_od1 = 0, last_od2 = 0, last_od3 = 0;
 volatile float x_frame, y_frame, x_glob = 0, y_glob = 0;
+
+///////////////////// P2P Control Vars /////////////////////
+float mapgyro;
+float d_i = 0;
+const float s_kp = 10.0f, s_ki = 0.20f, s_kd = 4.0f;
+const float h_kp = 2.50f, h_ki = 0.00f, h_kd = 1.00f;
+float dx, dy, dsm, s_error, d_s, s_edit, compensateTht;
+float h_edit, h_error = 0, h_preverror = 0, h_p = 0, h_i = 0, h_d = 0;
+long p2pTargetTime = 0;
+////////////////////////////////////////////////////////////
+
+#define MAX_SPD 20
 
 union packed_int
 {
@@ -248,18 +260,19 @@ void setup()
   }
   stopAll2();
 
-  // Start Sub routine (Swerve Dish Position Control) //
+  // Start Sub routine (Swerve Dish Position Control) ////////////////
   subroutine_posCon1.begin(degAdj1_posCon, 1000);
   subroutine_posCon2.begin(degAdj2_posCon, 1000);
   subroutine_posCon3.begin(degAdj3_posCon, 1000);
 
-  swerve_deg1 = swerve_off1;
-  swerve_deg2 = swerve_off2;
-  swerve_deg3 = swerve_off3;
-  delay(1000);
-  setDegSwerve(0, 0, 0, 0, 0, 0);
+  // swerve_deg1 = swerve_off1;
+  // swerve_deg2 = swerve_off2;
+  // swerve_deg3 = swerve_off3;
+  // delay(1000);
+  setDegSwerve(90, 90, 90, 0, 0, 0);
   delay(3000);
 
+  Serial.println("press red");
   while (digitalRead(SW_Red) == 1)
     ;
   delay(1000);
@@ -324,17 +337,56 @@ uint32_t looptime = 1;
 
 long lasttime_shit = 0;
 
-
 uint32_t localizeTime = 0;
 void loop()
 {
-  stopFlag = true;
+  // headingControl(30, 90, 0);
+  // setDegSwerve(90,90,90,0 ,0 ,0);
+  // while (digitalRead(SW_Red) == 1)
+  //   ;
+  // delay(1000);
+  // setDegSwerve(0,0,0,0 ,0 ,0);
+  // while (digitalRead(SW_Red) == 1)
+  //   ;
+  // delay(1000);
+  // setDegSwerve(270,270,270,0 ,0 ,0);
+  // while (digitalRead(SW_Red) == 1)
+  //   ;
+  // delay(1000);
+  // setDegSwerve(180,180,180,0 ,0 ,0);
+  // while (digitalRead(SW_Red) == 1)
+  //   ;
+  // delay(1000);
+  // setDegSwerve(200,200,200,0 ,0 ,0);
+  // while (digitalRead(SW_Red) == 1)
+  //   ;
+  // delay(1000);
+  p2ptrack(0, 0.5, 0);
   stopAll2();
-  if (millis() - localizeTime > 10) {
-    localizeTime = millis();
-    getRobotPosition();
+  delay(1000);
+  p2ptrack(0.5, 0.5, 0);
+  stopAll2();
+  delay(1000);
+  p2ptrack(0.5, 0, 0);
+  stopAll2();
+  delay(1000);
+   p2ptrack(0, 0, 0);
+  stopAll2();
+  delay(1000);
+  while (1)
+  {
+    stopFlag = true;
+    stopAll2();
   }
-  
+  // stopFlag = true;
+  // stopAll2();
+  // if (millis() - localizeTime > 10)
+  // {
+  //   localizeTime = millis();
+  //   sendCmd(10, 10, -10);
+  //   getRobotPosition();
+  // }
+
   // lasttime_shit = millis();
   // while (millis() - lasttime_shit < 1000)
   // {
@@ -355,6 +407,112 @@ void loop()
   //     Serial.println(x);
   //   }
   // }
+}
+void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
+{
+  static volatile float s_prev_error = 0.0f;
+  static bool onPoint = false;
+  static float theta = 0;
+
+  while (1)
+  {
+    getRobotPosition();
+    dx = set_x - x_glob;
+    dy = set_y - y_glob;
+    dsm = sqrt(pow(dx, 2) + pow(dy, 2));
+
+    s_error = dsm;
+    d_i += s_error;
+    d_i = constrain(d_i, -1000, 1000);
+    d_s = s_error - s_prev_error;
+    s_prev_error = s_error;
+
+    float gyro_pos = readGyro() - gyro_offset;
+    if (abs(gyro_pos) - set_head > gyro_accept)
+    {
+      h_error = gyro_pos - set_head;
+    }
+    else
+    {
+      h_error = 0;
+    }
+    h_p = h_kp * h_error;
+    h_d = (h_error - h_preverror) * h_kd;
+    h_preverror = h_error;
+    h_edit = h_p + h_d;
+
+    if (dx == 0 && dy == 0)
+    {
+      theta = 0;
+    }
+    else
+    {
+      theta = atan2(dy, dx) * (180 / PI);
+    }
+    if (theta < 0) {
+      theta += 360;
+    }
+    // if (theta > 180) {
+    //   theta -= 180;
+    // } else if (theta < -180) {
+    //   theta += 180;
+    // }
+
+    mapgyro = gyro_pos;
+    if (mapgyro > 0)
+    {
+      mapgyro = fmod(mapgyro, 360);
+    }
+    else if (mapgyro < 0)
+    {
+      mapgyro = fmod(abs(mapgyro), 360 * -1);
+    }
+
+    s_edit = (s_error * s_kp) + (d_i * s_ki) + (s_kd * d_s);
+    h_edit = (h_error * h_kp) + (h_i * h_ki) + (h_kd * h_d);
+    compensateTht = theta + mapgyro;
+
+    if ((abs(dx) <= 0.05 && abs(dy) <= 0.05) && abs(h_error) <= gyro_accept)
+    {
+
+      if (onPoint == false)
+      {
+        p2pTargetTime = millis();
+      }
+      onPoint = true;
+      if (millis() - p2pTargetTime > 500 || viaMode)
+      {
+        // atTarget = true;
+        sendCmd(0, 0, 0);
+        Serial.println("Break");
+        break;
+      }
+    }
+    else
+    {
+      onPoint = false;
+    }
+    if (s_edit > MAX_SPD)
+    {
+      s_edit = MAX_SPD;
+    }
+    else if (s_edit < -MAX_SPD)
+    {
+      s_edit = -MAX_SPD;
+    }
+    // Serial.print(theta);
+    // Serial.print("\t");
+    // Serial.print(s_edit);
+    // Serial.print("\t");
+    // Serial.print(compensateTht);
+    // Serial.print("\t");
+    // Serial.print(h_edit);
+    // Serial.print("\t");
+    // Serial.print(x_glob);
+    // Serial.print("\t");
+    // Serial.println(y_glob);
+    swerveDrive(s_edit, compensateTht, -h_edit);
+  }
 }
 
 void getRobotPosition()
@@ -386,29 +544,44 @@ void getRobotPosition()
   actual_deg2 = (swerve_off2 - swerve_deg2) / DegToPulseConst;
   actual_deg3 = (swerve_off3 - swerve_deg3) / DegToPulseConst;
 
-  // 
-  Serial.print(od1);
-  Serial.print("\t");
-  Serial.print(od2);
-  Serial.print("\t");
-  Serial.print(od3);
-  Serial.print(" || ");
-  Serial.print(actual_deg1);
-  Serial.print("\t");
-  Serial.print(actual_deg2);
-  Serial.print("\t");
-  Serial.println(actual_deg3);
-  // Localization Equation Here 
+  //
+  // Serial.print(od1);
+  // Serial.print("\t");
+  // Serial.print(od2);
+  // Serial.print("\t");
+  // Serial.print(od3);
+  // Serial.print(" || ");
+  // Serial.print(actual_deg1);
+  // Serial.print("\t");
+  // Serial.print(actual_deg2);
+  // Serial.print("\t");
+  // Serial.println(actual_deg3);
+  // Localization Equation Here
+  static float vx, vy, v1x, v2x, v3x, v1y, v2y, v3y;
+  v1x = od1 * cos(degToRad(actual_deg1));
+  v1y = od1 * sin(degToRad(actual_deg1));
 
+  v2x = od2 * cos(degToRad(actual_deg2));
+  v2y = od2 * sin(degToRad(actual_deg2));
 
+  v3x = od3 * cos(degToRad(actual_deg3));
+  v3y = od3 * sin(degToRad(actual_deg3));
 
+  vx = (v1x + v2x + v3x) * 0.00142f;
+  vy = (v1y + v2y + v3y) * 0.00142f;
 
+  x_frame = vx * xCon;
+  y_frame = vy * yCon;
+  float gyro_pos = readGyro() - gyro_offset;
+  x_glob += (x_frame * cos(degToRad(gyro_pos)) - y_frame * sin(degToRad(gyro_pos)));
+  y_glob += (x_frame * sin(degToRad(gyro_pos)) + y_frame * cos(degToRad(gyro_pos)));
 
-
-
-
+  // Serial.print(gyro_pos);
+  // Serial.print("\t");
+  // Serial.print(x_glob);
+  // Serial.print("\t");
+  // Serial.println(y_glob);
   ///////////////////////////////
-
 }
 
 void moveWithDelay(float spd, float dir, float head, int duration)
@@ -416,7 +589,7 @@ void moveWithDelay(float spd, float dir, float head, int duration)
   // TODO
 }
 
-void swerveDrive(float spd, float dir, float omega, bool rotateOnly)
+void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false)
 {
   if (millis() - sendSpeedTime > 10)
   {
@@ -493,7 +666,7 @@ void swerveDrive(float spd, float dir, float omega, bool rotateOnly)
 
     if (rotateOnly)
     {
-      priorityDegPosCon(thet1, thet2, thet3);
+      //priorityDegPosCon(thet1, thet2, thet3);
     }
     else
     {
@@ -609,7 +782,9 @@ void priorityDegPosCon(int deg1, int deg2, int deg3)
     {
       atTarget = false;
     }
+    // Serial.println("still here");
   }
+  Serial.println("done");
 }
 
 float degToRad(float val)
@@ -758,6 +933,10 @@ void setDegSwerve(int deg1, int deg2, int deg3, float v1, float v2, float v3)
   {
     deg3 += 360;
   }
+
+  if (deg1 < -160) deg1 += 360;
+  if (deg2 < -160) deg2 += 360;
+  if (deg3 < -160) deg3 += 360;
 
   swerve_deg1 = swerve_off1 - (deg1 * DegToPulseConst);
   swerve_deg2 = swerve_off2 - (deg2 * DegToPulseConst);
