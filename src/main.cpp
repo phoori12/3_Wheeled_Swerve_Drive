@@ -164,7 +164,7 @@ float h_edit, h_error = 0, h_preverror = 0, h_p = 0, h_i = 0, h_d = 0;
 long p2pTargetTime = 0;
 ////////////////////////////////////////////////////////////
 
-#define MAX_SPD 40
+#define MAX_SPD 20
 
 union packed_int
 {
@@ -933,9 +933,9 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
 
   // Closet Angle
 
-  float checkdeg1 = closestAngle(deg1, prev_deg1);
-  float checkdeg2 = closestAngle(deg2, prev_deg2);
-  float checkdeg3 = closestAngle(deg3, prev_deg3);
+  float checkdeg1 = closestAngle(prev_deg1, deg1);
+  float checkdeg2 = closestAngle(prev_deg2, deg2);
+  float checkdeg3 = closestAngle(prev_deg3, deg3);
 
   deg1 = prev_deg1 + checkdeg1;
   deg2 = prev_deg2 + checkdeg2;
