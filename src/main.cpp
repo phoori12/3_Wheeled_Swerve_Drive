@@ -76,7 +76,7 @@ void stopAll2();
 void degAdj1_posCon();
 void degAdj2_posCon();
 void degAdj3_posCon();
-void priorityDegPosCon(int deg1, int deg2, int deg3);
+void priorityDegPosCon(int pulse1, int pulse2, int pulse3);
 void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false);
 void setDegSwerve(int deg1, int deg2, int deg3, float v1, float v2, float v3);
 void spinCCW();
@@ -508,7 +508,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     // Serial.print(x_glob);
     // Serial.print("\t");
     // Serial.println(y_glob);
-     swerveDrive(s_edit, compensateTht, -h_edit);
+    swerveDrive(s_edit, compensateTht, -h_edit);
   }
 }
 
@@ -672,11 +672,15 @@ void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false)
   }
 }
 
-void priorityDegPosCon(int deg1, int deg2, int deg3)
+void priorityDegPosCon(int pulse1, int pulse2, int pulse3)
 {
   long targetTime = 500;
   bool atTarget = false;
   uint32_t last = millis();
+
+  swerve_deg1 = pulse1;
+  swerve_deg2 = pulse2;
+  swerve_deg3 = pulse3;
 
   while (true)
   {
@@ -781,11 +785,6 @@ void priorityDegPosCon(int deg1, int deg2, int deg3)
     }
     // Serial.println("still here");
   }
-  Serial.print(deg1);
-  Serial.print("\t");
-  Serial.print(deg2);
-  Serial.print("\t");
-  Serial.println(deg3);
   Serial.println("done");
 }
 
@@ -908,80 +907,43 @@ void degAdj3_posCon()
   }
 }
 
-void setDegSwerve(int deg1, int deg2, int deg3, float v1, float v2, float v3)
+float closestAngle(float a, float b)
 {
-  stopFlag = false;
-  if (deg1 >= 360)
+  float dir = fmod(b, 360) - fmod(a, 360);
+
+  if (abs(dir) > 180.0f)
   {
-    deg1 -= 360;
-  }
-  else if (deg1 <= -360)
-  {
-    deg1 += 360;
-  }
-  if (deg2 >= 360)
-  {
-    deg2 -= 360;
-  }
-  else if (deg2 <= -360)
-  {
-    deg2 += 360;
-  }
-  if (deg3 >= 360)
-  {
-    deg3 -= 360;
-  }
-  else if (deg3 <= -360)
-  {
-    deg3 += 360;
+    int signum = 0;
+    if (dir > 0)
+      signum = 1;
+    if (dir < 0)
+      signum = -1;
+    if (dir == 0)
+      signum = 0;
+
+    dir = -(signum * 360) + dir;
   }
 
-  float checkdeg1 = prev_deg1 - deg1;
-  float checkdeg2 = prev_deg2 - deg2;
-  float checkdeg3 = prev_deg3 - deg3;
+  return dir;
+}
+
+void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float v3)
+{
+  stopFlag = false;
+
+  // Closet Angle
+
+  float checkdeg1 = closestAngle(deg1, prev_deg1);
+  float checkdeg2 = closestAngle(deg2, prev_deg2);
+  float checkdeg3 = closestAngle(deg3, prev_deg3);
 
   actual_deg1 = deg1;
   actual_deg2 = deg2;
   actual_deg3 = deg3;
 
-  if (checkdeg1 > 0)
-  {
-    checkdeg1 = 360 - checkdeg1;
-  }
-  else if (checkdeg1 < 0)
-  {
-    checkdeg1 = -(360 + checkdeg1);
-  }
-  if (checkdeg2 > 0)
-  {
-    checkdeg2 = 360 - checkdeg2;
-  }
-  else if (checkdeg2 < 0)
-  {
-    checkdeg2 = -(360 + checkdeg2);
-  }
-  if (checkdeg3 > 0)
-  {
-    checkdeg3 = 360 - checkdeg3;
-  }
-  else if (checkdeg3 < 0)
-  {
-    checkdeg3 = -(360 + checkdeg3);
-  }
-
-  if (abs(checkdeg1) < 180)
-  {
-    deg1 = prev_deg1 + checkdeg1;
-  }
-  if (abs(checkdeg2) < 180)
-  {
-    deg2 = prev_deg2 + checkdeg2;
-  }
-  if (abs(checkdeg3) < 180)
-  {
-    deg3 = prev_deg3 + checkdeg3;
-  }
-
+  deg1 = prev_deg1 + checkdeg1;
+  deg2 = prev_deg2 + checkdeg2;
+  deg3 = prev_deg3 + checkdeg3;
 
   swerve_deg1 = swerve_off1 - (deg1 * DegToPulseConst);
   swerve_deg2 = swerve_off2 - (deg2 * DegToPulseConst);
@@ -997,7 +959,7 @@ void setDegSwerve(int deg1, int deg2, int deg3, float v1, float v2, float v3)
   // Serial.print("\t");
   // Serial.print(checkdeg3);
   // Serial.print("\t");
-  
+
   if (gradUnterscheid_1 > 1050 || gradUnterscheid_2 > 1050 || gradUnterscheid_3 > 1050)
   {
     sendCmd(0, 0, 0);
