@@ -937,13 +937,13 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
   float checkdeg2 = closestAngle(deg2, prev_deg2);
   float checkdeg3 = closestAngle(deg3, prev_deg3);
 
-  actual_deg1 = deg1;
-  actual_deg2 = deg2;
-  actual_deg3 = deg3;
-
   deg1 = prev_deg1 + checkdeg1;
   deg2 = prev_deg2 + checkdeg2;
   deg3 = prev_deg3 + checkdeg3;
+
+  actual_deg1 = deg1;
+  actual_deg2 = deg2;
+  actual_deg3 = deg3;
 
   swerve_deg1 = swerve_off1 - (deg1 * DegToPulseConst);
   swerve_deg2 = swerve_off2 - (deg2 * DegToPulseConst);
