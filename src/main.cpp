@@ -104,7 +104,7 @@ float pulsePerDeg = 11.377778;
 
 // PID Variables //
 const float p_kp1 = 8.50f, p_ki1 = 0.1f, p_kd1 = 1.00f; // kp 8.00f
-const float p_kp2 = 7.30f, p_ki2 = 0.04f, p_kd2 = 1.00f;
+const float p_kp2 = 7.30f, p_ki2 = 0.1f, p_kd2 = 1.00f;
 const float p_kp3 = 7.50f, p_ki3 = 0.03f, p_kd3 = 1.00f;
 
 float p_edit1, p_error1 = 0, p_preverror1 = 0, p_p1 = 0, p_i1 = 0, p_d1 = 0;
@@ -132,6 +132,7 @@ int swerve_off3 = 400;
 int swerve_right1 = -300;  //-2400
 int swerve_right2 = -3200; // -5300
 int swerve_right3 = 2500;  // 4600
+volatile float prev_deg1, prev_deg2, prev_deg3;
 
 int marginError = 10;
 
@@ -163,7 +164,7 @@ float h_edit, h_error = 0, h_preverror = 0, h_p = 0, h_i = 0, h_d = 0;
 long p2pTargetTime = 0;
 ////////////////////////////////////////////////////////////
 
-#define MAX_SPD 20
+#define MAX_SPD 40
 
 union packed_int
 {
@@ -340,27 +341,27 @@ long lasttime_shit = 0;
 uint32_t localizeTime = 0;
 void loop()
 {
-  // headingControl(30, 90, 0);
-  // setDegSwerve(90,90,90,0 ,0 ,0);
-  // while (digitalRead(SW_Red) == 1)
-  //   ;
-  // delay(1000);
-  // setDegSwerve(0,0,0,0 ,0 ,0);
-  // while (digitalRead(SW_Red) == 1)
-  //   ;
-  // delay(1000);
-  // setDegSwerve(270,270,270,0 ,0 ,0);
-  // while (digitalRead(SW_Red) == 1)
-  //   ;
-  // delay(1000);
-  // setDegSwerve(180,180,180,0 ,0 ,0);
-  // while (digitalRead(SW_Red) == 1)
-  //   ;
-  // delay(1000);
-  // setDegSwerve(200,200,200,0 ,0 ,0);
-  // while (digitalRead(SW_Red) == 1)
-  //   ;
-  // delay(1000);
+  // headingControl(30, -90, 0);
+  //  setDegSwerve(90,90,90,0 ,0 ,0);
+  //  while (digitalRead(SW_Red) == 1)
+  //    ;
+  //  delay(1000);
+  //  setDegSwerve(0,0,0,0 ,0 ,0);
+  //  while (digitalRead(SW_Red) == 1)
+  //    ;
+  //  delay(1000);
+  //  setDegSwerve(270,270,270,0 ,0 ,0);
+  //  while (digitalRead(SW_Red) == 1)
+  //    ;
+  //  delay(1000);
+  //  setDegSwerve(180,180,180,0 ,0 ,0);
+  //  while (digitalRead(SW_Red) == 1)
+  //    ;
+  //  delay(1000);
+  //  setDegSwerve(200,200,200,0 ,0 ,0);
+  //  while (digitalRead(SW_Red) == 1)
+  //    ;
+  //  delay(1000);
   p2ptrack(0, 0.5, 0);
   stopAll2();
   delay(1000);
@@ -370,7 +371,7 @@ void loop()
   p2ptrack(0.5, 0, 0);
   stopAll2();
   delay(1000);
-   p2ptrack(0, 0, 0);
+  p2ptrack(0, 0, 0);
   stopAll2();
   delay(1000);
   while (1)
@@ -413,7 +414,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
   static volatile float s_prev_error = 0.0f;
   static bool onPoint = false;
   static float theta = 0;
-
+  set_head = -set_head;
   while (1)
   {
     getRobotPosition();
@@ -428,7 +429,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     s_prev_error = s_error;
 
     float gyro_pos = readGyro() - gyro_offset;
-    if (abs(gyro_pos) - set_head > gyro_accept)
+    if (abs(abs(gyro_pos) - set_head) > gyro_accept)
     {
       h_error = gyro_pos - set_head;
     }
@@ -441,22 +442,13 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     h_preverror = h_error;
     h_edit = h_p + h_d;
 
-    if (dx == 0 && dy == 0)
-    {
-      theta = 0;
-    }
-    else
+    if (dx != 0 || dy != 0)
     {
       theta = atan2(dy, dx) * (180 / PI);
     }
-    if (theta < 0) {
-      theta += 360;
-    }
-    // if (theta > 180) {
-    //   theta -= 180;
-    // } else if (theta < -180) {
-    //   theta += 180;
-    // }
+
+    // if cz > pi : cz = 2pi * cz
+    // if cz < -pi : cz = 2pi + cz
 
     mapgyro = gyro_pos;
     if (mapgyro > 0)
@@ -469,7 +461,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     }
 
     s_edit = (s_error * s_kp) + (d_i * s_ki) + (s_kd * d_s);
-    h_edit = (h_error * h_kp) + (h_i * h_ki) + (h_kd * h_d);
+    // h_edit = (h_error * h_kp) + (h_i * h_ki) + (h_kd * h_d);
     compensateTht = theta + mapgyro;
 
     if ((abs(dx) <= 0.05 && abs(dy) <= 0.05) && abs(h_error) <= gyro_accept)
@@ -500,18 +492,23 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     {
       s_edit = -MAX_SPD;
     }
+    // Serial.print(h_error);
+    // Serial.print("\t");
+    // Serial.print(-h_edit);
+    // Serial.print("\t");
+    // Serial.println(gyro_pos);
     // Serial.print(theta);
     // Serial.print("\t");
     // Serial.print(s_edit);
     // Serial.print("\t");
     // Serial.print(compensateTht);
     // Serial.print("\t");
-    // Serial.print(h_edit);
+    // Serial.print(-h_edit);
     // Serial.print("\t");
     // Serial.print(x_glob);
     // Serial.print("\t");
     // Serial.println(y_glob);
-    swerveDrive(s_edit, compensateTht, -h_edit);
+     swerveDrive(s_edit, compensateTht, -h_edit);
   }
 }
 
@@ -540,9 +537,9 @@ void getRobotPosition()
   last_od2 = od2_now;
   last_od3 = od3_now;
   // get each Swerve's degree
-  actual_deg1 = (swerve_off1 - swerve_deg1) / DegToPulseConst;
-  actual_deg2 = (swerve_off2 - swerve_deg2) / DegToPulseConst;
-  actual_deg3 = (swerve_off3 - swerve_deg3) / DegToPulseConst;
+  // actual_deg1 = (swerve_off1 - swerve_deg1) / DegToPulseConst;
+  // actual_deg2 = (swerve_off2 - swerve_deg2) / DegToPulseConst;
+  // actual_deg3 = (swerve_off3 - swerve_deg3) / DegToPulseConst;
 
   //
   // Serial.print(od1);
@@ -572,7 +569,7 @@ void getRobotPosition()
 
   x_frame = vx * xCon;
   y_frame = vy * yCon;
-  float gyro_pos = readGyro() - gyro_offset;
+  float gyro_pos = -(readGyro() - gyro_offset);
   x_glob += (x_frame * cos(degToRad(gyro_pos)) - y_frame * sin(degToRad(gyro_pos)));
   y_glob += (x_frame * sin(degToRad(gyro_pos)) + y_frame * cos(degToRad(gyro_pos)));
 
@@ -666,7 +663,7 @@ void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false)
 
     if (rotateOnly)
     {
-      //priorityDegPosCon(thet1, thet2, thet3);
+      // priorityDegPosCon(thet1, thet2, thet3);
     }
     else
     {
@@ -784,6 +781,11 @@ void priorityDegPosCon(int deg1, int deg2, int deg3)
     }
     // Serial.println("still here");
   }
+  Serial.print(deg1);
+  Serial.print("\t");
+  Serial.print(deg2);
+  Serial.print("\t");
+  Serial.println(deg3);
   Serial.println("done");
 }
 
@@ -934,9 +936,52 @@ void setDegSwerve(int deg1, int deg2, int deg3, float v1, float v2, float v3)
     deg3 += 360;
   }
 
-  if (deg1 < -160) deg1 += 360;
-  if (deg2 < -160) deg2 += 360;
-  if (deg3 < -160) deg3 += 360;
+  float checkdeg1 = prev_deg1 - deg1;
+  float checkdeg2 = prev_deg2 - deg2;
+  float checkdeg3 = prev_deg3 - deg3;
+
+  actual_deg1 = deg1;
+  actual_deg2 = deg2;
+  actual_deg3 = deg3;
+
+  if (checkdeg1 > 0)
+  {
+    checkdeg1 = 360 - checkdeg1;
+  }
+  else if (checkdeg1 < 0)
+  {
+    checkdeg1 = -(360 + checkdeg1);
+  }
+  if (checkdeg2 > 0)
+  {
+    checkdeg2 = 360 - checkdeg2;
+  }
+  else if (checkdeg2 < 0)
+  {
+    checkdeg2 = -(360 + checkdeg2);
+  }
+  if (checkdeg3 > 0)
+  {
+    checkdeg3 = 360 - checkdeg3;
+  }
+  else if (checkdeg3 < 0)
+  {
+    checkdeg3 = -(360 + checkdeg3);
+  }
+
+  if (abs(checkdeg1) < 180)
+  {
+    deg1 = prev_deg1 + checkdeg1;
+  }
+  if (abs(checkdeg2) < 180)
+  {
+    deg2 = prev_deg2 + checkdeg2;
+  }
+  if (abs(checkdeg3) < 180)
+  {
+    deg3 = prev_deg3 + checkdeg3;
+  }
+
 
   swerve_deg1 = swerve_off1 - (deg1 * DegToPulseConst);
   swerve_deg2 = swerve_off2 - (deg2 * DegToPulseConst);
@@ -946,11 +991,13 @@ void setDegSwerve(int deg1, int deg2, int deg3, float v1, float v2, float v3)
   float gradUnterscheid_2 = abs(abs(prev_swerve_deg2) - abs(swerve_deg2));
   float gradUnterscheid_3 = abs(abs(prev_swerve_deg3) - abs(swerve_deg3));
 
-  // Serial.print(swerve_deg1);
+  // Serial.print(checkdeg1);
   // Serial.print("\t");
-  // Serial.print(swerve_deg2);
+  // Serial.print(checkdeg2);
   // Serial.print("\t");
-  // Serial.println(swerve_deg3);
+  // Serial.print(checkdeg3);
+  // Serial.print("\t");
+  
   if (gradUnterscheid_1 > 1050 || gradUnterscheid_2 > 1050 || gradUnterscheid_3 > 1050)
   {
     sendCmd(0, 0, 0);
@@ -966,6 +1013,9 @@ void setDegSwerve(int deg1, int deg2, int deg3, float v1, float v2, float v3)
   prev_swerve_deg1 = swerve_deg1;
   prev_swerve_deg2 = swerve_deg2;
   prev_swerve_deg3 = swerve_deg3;
+  prev_deg1 = deg1;
+  prev_deg2 = deg2;
+  prev_deg3 = deg3;
 }
 
 void spinCCW()
