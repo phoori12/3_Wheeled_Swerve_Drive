@@ -131,18 +131,22 @@ volatile bool negMul_2 = false;
 volatile bool negMul_3 = false;
 
 // Swerve Offset and Deg Conversion Variables //
-int swerve_off1 = 1800;
-int swerve_off2 = -1100;
-int swerve_off3 = 400;
+int swerve_off1 = 1792; // 1800
+int swerve_off2 = -1036; // -1100
+int swerve_off3 = 436; // 400
 
-int swerve_right1 = -300;  //-2400
-int swerve_right2 = -3200; // -5300
-int swerve_right3 = 2500;  // 4600
+int swerve_right1 = -278;  //-300
+int swerve_right2 = -3163; // -3200
+int swerve_right3 = -1706;  // 2500
 volatile float prev_deg1, prev_deg2, prev_deg3;
 
 int marginError = 10;
 
-const float DegToPulseConst = 23.3333;
+const float DegToPulseConst = 23.3333; // 23.3333f
+const float degToPulseConst_1 = (swerve_off1 - swerve_right1) / 90;
+const float degToPulseConst_2 = (swerve_off2 - swerve_right2) / 90;
+const float degToPulseConst_3 = (swerve_off3 - swerve_right3) / 90;
+
 IntervalTimer subroutine_posCon1;
 IntervalTimer subroutine_posCon2;
 IntervalTimer subroutine_posCon3;
@@ -328,12 +332,8 @@ void setup()
   subroutine_posCon2.begin(degAdj2_posCon, 1000);
   subroutine_posCon3.begin(degAdj3_posCon, 1000);
 
-  // swerve_deg1 = swerve_off1;
-  // swerve_deg2 = swerve_off2;
-  // swerve_deg3 = swerve_off3;
-  // delay(1000);
-  setDegSwerve(90, 90, 90, 0, 0, 0);
-  delay(3000);
+  setDegSwerve(0, 0, 0, 0, 0, 0);
+  delay(1000);
 
   Serial.println("press red");
   while (digitalRead(SW_Red) == 1)
@@ -403,72 +403,77 @@ long lasttime_shit = 0;
 uint32_t localizeTime = 0;
 void loop()
 {
-  // headingControl(30, -90, 0);
-  //  setDegSwerve(90,90,90,0 ,0 ,0);
-  //  while (digitalRead(SW_Red) == 1)
-  //    ;
-  //  delay(1000);
-  //  setDegSwerve(0,0,0,0 ,0 ,0);
-  //  while (digitalRead(SW_Red) == 1)
-  //    ;
-  //  delay(1000);
-  //  setDegSwerve(270,270,270,0 ,0 ,0);
-  //  while (digitalRead(SW_Red) == 1)
-  //    ;
-  //  delay(1000);
-  //  setDegSwerve(180,180,180,0 ,0 ,0);
-  //  while (digitalRead(SW_Red) == 1)
-  //    ;
-  //  delay(1000);
-  //  setDegSwerve(200,200,200,0 ,0 ,0);
-  //  while (digitalRead(SW_Red) == 1)
-  //    ;
-  //  delay(1000);
-  p2ptrack(0, 0.5, -90);
-  stopAll2();
-  delay(1000);
-  p2ptrack(0.5, 0.5, -180);
-  stopAll2();
-  delay(1000);
-  p2ptrack(0.5, 0, 90);
-  stopAll2();
-  delay(1000);
-  p2ptrack(0, 0, 0);
-  stopAll2();
-  delay(1000);
-  while (1)
-  {
-    stopFlag = true;
-    stopAll2();
-  }
   // stopFlag = true;
+  // Serial.println("First wheel setup");
+  // while (digitalRead(SW_Bla) == 1) // 1st Swerve
+  // {
+  //   if (digitalRead(SW_Yel) == 0 && digitalRead(SW_Red) == 1)
+  //   {
+  //     spin_drive(1, -400);
+  //   }
+  //   else if (digitalRead(SW_Yel) == 1 && digitalRead(SW_Red) == 0)
+  //   {
+  //     spin_drive(1, 400);
+  //   }
+  //   else
+  //   {
+  //     spin_drive(1, 0);
+  //   }
+  //   Serial.println(ENC1_Count);
+  // }
+  // Serial.println("Second wheel setup");
+  // delay(1000);
+  // while (digitalRead(SW_Bla) == 1) // 2nd Swerve
+  // {
+  //   if (digitalRead(SW_Yel) == 0 && digitalRead(SW_Red) == 1)
+  //   {
+  //     spin_drive(2, -400);
+  //   }
+  //   else if (digitalRead(SW_Yel) == 1 && digitalRead(SW_Red) == 0)
+  //   {
+  //     spin_drive(2, 400);
+  //   }
+  //   else
+  //   {
+  //     spin_drive(2, 0);
+  //   }
+  //   Serial.println(ENC2_Count);
+  // }
+  // Serial.println("Third wheel setup");
+  // delay(1000);
+  // while (digitalRead(SW_Bla) == 1) // 3rd Swerve
+  // {
+  //   if (digitalRead(SW_Yel) == 0 && digitalRead(SW_Red) == 1)
+  //   {
+  //     spin_drive(3, -400);
+  //   }
+  //   else if (digitalRead(SW_Yel) == 1 && digitalRead(SW_Red) == 0)
+  //   {
+  //     spin_drive(3, 400);
+  //   }
+  //   else
+  //   {
+  //     spin_drive(3, 0);
+  //   }
+  //   Serial.println(ENC3_Count);
+  // }
+  // delay(1000);
+  // p2ptrack(0, 0.5, 0);
   // stopAll2();
-  // if (millis() - localizeTime > 10)
+  // delay(1000);
+  // p2ptrack(0.5, 0.5, 0);
+  // stopAll2();
+  // delay(1000);
+  // p2ptrack(0.5, 0, 0);
+  // stopAll2();
+  // delay(1000);
+  // p2ptrack(0, 0, 0);
+  // stopAll2();
+  // delay(1000);
+  // while (1)
   // {
-  //   localizeTime = millis();
-  //   sendCmd(10, 10, -10);
-  //   getRobotPosition();
-  // }
-
-  // lasttime_shit = millis();
-  // while (millis() - lasttime_shit < 1000)
-  // {
-  //   if (millis() - sendSpeedTime > 10)
-  //   {
-  //     sendSpeedTime = millis();
-  //     sendCmd(10, 0, 0);
-  //     Serial.println(x);
-  //   }
-  // }
-  // lasttime_shit = millis();
-  // while (millis() - lasttime_shit < 1000)
-  // {
-  //   if (millis() - sendSpeedTime > 10)
-  //   {
-  //     sendSpeedTime = millis();
-  //     sendCmd(-10, 0, 0);
-  //     Serial.println(x);
-  //   }
+  //   stopFlag = true;
+  //   stopAll2();
   // }
 }
 void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
@@ -1096,9 +1101,9 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
   actual_deg2 = deg2;
   actual_deg3 = deg3;
 
-  swerve_deg1 = swerve_off1 - (deg1 * DegToPulseConst);
-  swerve_deg2 = swerve_off2 - (deg2 * DegToPulseConst);
-  swerve_deg3 = swerve_off3 - (deg3 * DegToPulseConst);
+  swerve_deg1 = swerve_off1 - (deg1 * degToPulseConst_1);
+  swerve_deg2 = swerve_off2 - (deg2 * degToPulseConst_2);
+  swerve_deg3 = swerve_off3 - (deg3 * degToPulseConst_3);
 
   float gradUnterscheid_1 = abs(abs(prev_swerve_deg1) - abs(swerve_deg1));
   float gradUnterscheid_2 = abs(abs(prev_swerve_deg2) - abs(swerve_deg2));
