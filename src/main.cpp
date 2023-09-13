@@ -66,7 +66,7 @@ void dmpDataReady()
   mpuInterrupt = true;
 }
 MPU6050 mpu;
-float gyro_accept = 3.00f;
+float gyro_accept = 6.00f;
 float gyro_offset = 0.00f;
 
 float readGyro();
@@ -78,7 +78,7 @@ void degAdj2_posCon();
 void degAdj3_posCon();
 void priorityDegPosCon(int pulse1, int pulse2, int pulse3);
 void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false);
-void setDegSwerve(int deg1, int deg2, int deg3, float v1, float v2, float v3);
+void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float v3);
 void spinCCW();
 void homeTheta();
 void stopAll();
@@ -94,6 +94,7 @@ void headingControl(float spd, float course, float set_head);
 void moveWithDelay(float spd, float dir, float omega, int duration);
 void getRobotPosition();
 void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false);
+float closestAngle(float a, float b);
 
 volatile long ENC1_Count = 0;
 volatile long ENC2_Count = 0;
@@ -123,6 +124,10 @@ volatile bool deg1Flag = false;
 volatile bool deg2Flag = false;
 volatile bool deg3Flag = false;
 volatile bool stopFlag = false;
+
+volatile bool negMul_1 = false;
+volatile bool negMul_2 = false;
+volatile bool negMul_3 = false;
 
 // Swerve Offset and Deg Conversion Variables //
 int swerve_off1 = 1800;
@@ -158,7 +163,7 @@ volatile float x_frame, y_frame, x_glob = 0, y_glob = 0;
 float mapgyro;
 float d_i = 0;
 const float s_kp = 10.0f, s_ki = 0.20f, s_kd = 4.0f;
-const float h_kp = 2.50f, h_ki = 0.00f, h_kd = 1.00f;
+const float h_kp = 1.25f, h_ki = 0.00f, h_kd = 1.00f;
 float dx, dy, dsm, s_error, d_s, s_edit, compensateTht;
 float h_edit, h_error = 0, h_preverror = 0, h_p = 0, h_i = 0, h_d = 0;
 long p2pTargetTime = 0;
@@ -240,6 +245,62 @@ void setup()
   analogWriteFrequency(PWM_3, 10000);
   analogWriteResolution(10);
 
+  // Manual Swerve Adjustments
+  spin_drive(1, 0);
+  spin_drive(2, 0);
+  spin_drive(3, 0);
+  Serial.println("First wheel setup");
+  while (digitalRead(SW_Bla) == 1) // 1st Swerve
+  {
+    if (digitalRead(SW_Yel) == 0 && digitalRead(SW_Red) == 1)
+    {
+      spin_drive(1, -700);
+    }
+    else if (digitalRead(SW_Yel) == 1 && digitalRead(SW_Red) == 0)
+    {
+      spin_drive(1, 700);
+    }
+    else
+    {
+      spin_drive(1, 0);
+    }
+  }
+  Serial.println("Second wheel setup");
+  delay(1000);
+  while (digitalRead(SW_Bla) == 1) // 2nd Swerve
+  {
+    if (digitalRead(SW_Yel) == 0 && digitalRead(SW_Red) == 1)
+    {
+      spin_drive(2, -700);
+    }
+    else if (digitalRead(SW_Yel) == 1 && digitalRead(SW_Red) == 0)
+    {
+      spin_drive(2, 700);
+    }
+    else
+    {
+      spin_drive(2, 0);
+    }
+  }
+  Serial.println("Third wheel setup");
+  delay(1000);
+  while (digitalRead(SW_Bla) == 1) // 3rd Swerve
+  {
+    if (digitalRead(SW_Yel) == 0 && digitalRead(SW_Red) == 1)
+    {
+      spin_drive(3, -700);
+    }
+    else if (digitalRead(SW_Yel) == 1 && digitalRead(SW_Red) == 0)
+    {
+      spin_drive(3, 700);
+    }
+    else
+    {
+      spin_drive(3, 0);
+    }
+  }
+  delay(1000);
+  Serial.println("GO HOME");
   // Homing before start //
   while (digitalRead(SW_Bla) == 1)
   {
@@ -362,13 +423,13 @@ void loop()
   //  while (digitalRead(SW_Red) == 1)
   //    ;
   //  delay(1000);
-  p2ptrack(0, 0.5, 0);
+  p2ptrack(0, 0.5, -90);
   stopAll2();
   delay(1000);
-  p2ptrack(0.5, 0.5, 0);
+  p2ptrack(0.5, 0.5, -180);
   stopAll2();
   delay(1000);
-  p2ptrack(0.5, 0, 0);
+  p2ptrack(0.5, 0, 180); // TODO map -270 to 180
   stopAll2();
   delay(1000);
   p2ptrack(0, 0, 0);
@@ -413,6 +474,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
 {
   static volatile float s_prev_error = 0.0f;
   static bool onPoint = false;
+  static float prev_compenstateTht = 0.0f;
   static float theta = 0;
   set_head = -set_head;
   while (1)
@@ -437,6 +499,9 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     {
       h_error = 0;
     }
+    float h_checkCompensate = closestAngle(h_preverror, h_error);
+    h_error = h_preverror + h_checkCompensate;
+
     h_p = h_kp * h_error;
     h_d = (h_error - h_preverror) * h_kd;
     h_preverror = h_error;
@@ -463,6 +528,9 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     s_edit = (s_error * s_kp) + (d_i * s_ki) + (s_kd * d_s);
     // h_edit = (h_error * h_kp) + (h_i * h_ki) + (h_kd * h_d);
     compensateTht = theta + mapgyro;
+    //float checkCompensate = closestAngle(prev_compenstateTht, compensateTht);
+    // map to -180 - 180
+    //compensateTht = prev_compenstateTht + checkCompensate;
 
     if ((abs(dx) <= 0.05 && abs(dy) <= 0.05) && abs(h_error) <= gyro_accept)
     {
@@ -492,23 +560,25 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     {
       s_edit = -MAX_SPD;
     }
+    
     // Serial.print(h_error);
     // Serial.print("\t");
     // Serial.print(-h_edit);
     // Serial.print("\t");
     // Serial.println(gyro_pos);
-    // Serial.print(theta);
-    // Serial.print("\t");
-    // Serial.print(s_edit);
-    // Serial.print("\t");
-    // Serial.print(compensateTht);
-    // Serial.print("\t");
-    // Serial.print(-h_edit);
-    // Serial.print("\t");
-    // Serial.print(x_glob);
-    // Serial.print("\t");
-    // Serial.println(y_glob);
+    Serial.print(theta);
+    Serial.print("\t");
+    Serial.print(s_edit);
+    Serial.print("\t");
+    Serial.print(compensateTht);
+    Serial.print("\t");
+    Serial.print(-h_edit);
+    Serial.print("\t");
+    Serial.print(x_glob);
+    Serial.print("\t");
+    Serial.println(y_glob);
     swerveDrive(s_edit, compensateTht, -h_edit);
+    prev_compenstateTht = compensateTht;
   }
 }
 
@@ -659,6 +729,21 @@ void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false)
     else
     {
       thet3 = radToDeg(atan2(vy3, vx3));
+    }
+
+    if (negMul_1)
+    {
+      vw1 = -vw1;
+    }
+
+    if (negMul_2)
+    {
+      vw2 = -vw2;
+    }
+
+    if (negMul_3)
+    {
+      vw3 = -vw3;
     }
 
     if (rotateOnly)
@@ -932,14 +1017,77 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
   stopFlag = false;
 
   // Closet Angle
-
+  // negMul
   float checkdeg1 = closestAngle(prev_deg1, deg1);
   float checkdeg2 = closestAngle(prev_deg2, deg2);
   float checkdeg3 = closestAngle(prev_deg3, deg3);
 
-  deg1 = prev_deg1 + checkdeg1;
-  deg2 = prev_deg2 + checkdeg2;
-  deg3 = prev_deg3 + checkdeg3;
+  float checkdeg1_flipped = closestAngle(prev_deg1, deg1 + 180.0f);
+  float checkdeg2_flipped = closestAngle(prev_deg2, deg2 + 180.0f);
+  float checkdeg3_flipped = closestAngle(prev_deg3, deg3 + 180.0f);
+
+  if (abs(checkdeg1) <= abs(checkdeg1_flipped))
+  {
+    negMul_1 = false;
+    deg1 = prev_deg1 + checkdeg1;
+  }
+  else if (abs(checkdeg1) >= abs(checkdeg1_flipped))
+  {
+    negMul_1 = true;
+    deg1 = prev_deg1 + checkdeg1_flipped;
+  }
+
+  if (abs(checkdeg2) <= abs(checkdeg2_flipped))
+  {
+    negMul_2 = false;
+    deg2 = prev_deg2 + checkdeg2;
+  }
+  else if (abs(checkdeg2) >= abs(checkdeg2_flipped))
+  {
+    negMul_2 = true;
+    deg2 = prev_deg2 + checkdeg2_flipped;
+  }
+
+  if (abs(checkdeg3) <= abs(checkdeg3_flipped))
+  {
+    negMul_3 = false;
+    deg3 = prev_deg3 + checkdeg3;
+  }
+  else if (abs(checkdeg3) >= abs(checkdeg3_flipped))
+  {
+    negMul_3 = true;
+    deg3 = prev_deg3 + checkdeg3_flipped;
+  }
+  // deg1 = prev_deg1 + checkdeg1;
+  // deg2 = prev_deg2 + checkdeg2;
+  // deg3 = prev_deg3 + checkdeg3;
+
+  if (deg1 >= 360)
+  {
+    deg1 -= 360;
+  }
+  else if (deg1 <= -360)
+  {
+    deg1 += 360;
+  }
+
+  if (deg2 >= 360)
+  {
+    deg2 -= 360;
+  }
+  else if (deg2 <= -360)
+  {
+    deg2 += 360;
+  }
+
+  if (deg3 >= 360)
+  {
+    deg3 -= 360;
+  }
+  else if (deg3 <= -360)
+  {
+    deg3 += 360;
+  }
 
   actual_deg1 = deg1;
   actual_deg2 = deg2;
