@@ -66,8 +66,9 @@ void dmpDataReady()
   mpuInterrupt = true;
 }
 MPU6050 mpu;
-float gyro_accept = 6.00f;
+float gyro_accept = 3.00f;
 float gyro_offset = 0.00f;
+float gyro_localizeMargin = 3.00f;
 
 float readGyro();
 float degToRad(float val);
@@ -163,7 +164,7 @@ volatile float x_frame, y_frame, x_glob = 0, y_glob = 0;
 float mapgyro;
 float d_i = 0;
 const float s_kp = 10.0f, s_ki = 0.20f, s_kd = 4.0f;
-const float h_kp = 1.25f, h_ki = 0.00f, h_kd = 1.00f;
+const float h_kp = 3.00f, h_ki = 0.00f, h_kd = 1.00f;
 float dx, dy, dsm, s_error, d_s, s_edit, compensateTht;
 float h_edit, h_error = 0, h_preverror = 0, h_p = 0, h_i = 0, h_d = 0;
 long p2pTargetTime = 0;
@@ -429,7 +430,7 @@ void loop()
   p2ptrack(0.5, 0.5, -180);
   stopAll2();
   delay(1000);
-  p2ptrack(0.5, 0, 180); // TODO map -270 to 180
+  p2ptrack(0.5, 0, 90); 
   stopAll2();
   delay(1000);
   p2ptrack(0, 0, 0);
@@ -527,12 +528,14 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
 
     s_edit = (s_error * s_kp) + (d_i * s_ki) + (s_kd * d_s);
     // h_edit = (h_error * h_kp) + (h_i * h_ki) + (h_kd * h_d);
-    compensateTht = theta + mapgyro;
-    //float checkCompensate = closestAngle(prev_compenstateTht, compensateTht);
-    // map to -180 - 180
-    //compensateTht = prev_compenstateTht + checkCompensate;
+    if (set_head >= 0) {
+      compensateTht = theta + mapgyro;
+    } else {
+      compensateTht = theta - mapgyro;
+    }
+    
 
-    if ((abs(dx) <= 0.05 && abs(dy) <= 0.05) && abs(h_error) <= gyro_accept)
+    if ((abs(dx) <= 0.05 && abs(dy) <= 0.05) && abs(h_error) <= gyro_accept + gyro_localizeMargin)
     {
 
       if (onPoint == false)
