@@ -105,8 +105,8 @@ volatile long ENC3_Count = 0;
 float pulsePerDeg = 11.377778;
 
 // PID Variables //
-const float p_kp1 = 8.50f, p_ki1 = 0.1f, p_kd1 = 1.00f; // kp 8.00f
-const float p_kp2 = 7.30f, p_ki2 = 0.1f, p_kd2 = 1.00f;
+const float p_kp1 = 4.35f, p_ki1 = 0.05f, p_kd1 = 1.40f; // kp 8.00f
+const float p_kp2 = 7.45f, p_ki2 = 0.1f, p_kd2 = 1.32f;
 const float p_kp3 = 7.50f, p_ki3 = 0.03f, p_kd3 = 1.00f;
 
 float p_edit1, p_error1 = 0, p_preverror1 = 0, p_p1 = 0, p_i1 = 0, p_d1 = 0;
@@ -131,16 +131,16 @@ volatile bool negMul_2 = false;
 volatile bool negMul_3 = false;
 
 // Swerve Offset and Deg Conversion Variables //
-int swerve_off1 = 1792; // 1800
+int swerve_off1 = 1792;  // 1800
 int swerve_off2 = -1036; // -1100
-int swerve_off3 = 436; // 400
+int swerve_off3 = 436;   // 400
 
 int swerve_right1 = -278;  //-300
 int swerve_right2 = -3163; // -3200
-int swerve_right3 = -1706;  // 2500
+int swerve_right3 = -1706; // 2500
 volatile float prev_deg1, prev_deg2, prev_deg3;
 
-int marginError = 10;
+int marginError = 15;
 
 const float DegToPulseConst = 23.3333; // 23.3333f
 const float degToPulseConst_1 = (swerve_off1 - swerve_right1) / 90;
@@ -403,7 +403,7 @@ long lasttime_shit = 0;
 uint32_t localizeTime = 0;
 void loop()
 {
-  // stopFlag = true;
+
   // Serial.println("First wheel setup");
   // while (digitalRead(SW_Bla) == 1) // 1st Swerve
   // {
@@ -458,23 +458,24 @@ void loop()
   //   Serial.println(ENC3_Count);
   // }
   // delay(1000);
-  // p2ptrack(0, 0.5, 0);
-  // stopAll2();
-  // delay(1000);
-  // p2ptrack(0.5, 0.5, 0);
-  // stopAll2();
-  // delay(1000);
-  // p2ptrack(0.5, 0, 0);
-  // stopAll2();
-  // delay(1000);
-  // p2ptrack(0, 0, 0);
-  // stopAll2();
-  // delay(1000);
-  // while (1)
-  // {
-  //   stopFlag = true;
-  //   stopAll2();
-  // }
+  p2ptrack(0, 0.5, 0);
+  stopAll2();
+  delay(1000);
+  p2ptrack(0.5, 0.5, 0);
+  stopAll2();
+  delay(1000);
+  p2ptrack(0.5, 0, 0);
+  stopAll2();
+  delay(1000);
+  p2ptrack(0, 0, 0);
+  stopAll2();
+  delay(1000);
+  setDegSwerve(90, 90, 90, 0, 0, 0);
+  while (1)
+  {
+    stopFlag = true;
+    stopAll2();
+  }
 }
 void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
 {
@@ -909,7 +910,7 @@ void degAdj1_posCon()
   if (millis() - lasttime1 >= looptime && !stopFlag)
   {
     lasttime1 = millis();
-    if (abs(ENC1_Count - swerve_deg1) > 2)
+    if (abs(ENC1_Count - swerve_deg1) > marginError)
     {
       p_error1 = swerve_deg1 - ENC1_Count;
     }
@@ -941,7 +942,7 @@ void degAdj2_posCon()
   if (millis() - lasttime2 >= looptime && !stopFlag)
   {
     lasttime2 = millis();
-    if (abs(ENC2_Count - swerve_deg2) > 2)
+    if (abs(ENC2_Count - swerve_deg2) > marginError)
     {
       p_error2 = swerve_deg2 - ENC2_Count;
     }
@@ -973,7 +974,7 @@ void degAdj3_posCon()
   if (millis() - lasttime3 >= looptime && !stopFlag)
   {
     lasttime3 = millis();
-    if (abs(ENC3_Count - swerve_deg3) > 2)
+    if (abs(ENC3_Count - swerve_deg3) > marginError)
     {
       p_error3 = swerve_deg3 - ENC3_Count;
     }
