@@ -430,7 +430,7 @@ void loop()
   p2ptrack(0.5, 0.5, -180);
   stopAll2();
   delay(1000);
-  p2ptrack(0.5, 0, 90); 
+  p2ptrack(0.5, 0, 90);
   stopAll2();
   delay(1000);
   p2ptrack(0, 0, 0);
@@ -475,7 +475,6 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
 {
   static volatile float s_prev_error = 0.0f;
   static bool onPoint = false;
-  static float prev_compenstateTht = 0.0f;
   static float theta = 0;
   set_head = -set_head;
   while (1)
@@ -528,12 +527,14 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
 
     s_edit = (s_error * s_kp) + (d_i * s_ki) + (s_kd * d_s);
     // h_edit = (h_error * h_kp) + (h_i * h_ki) + (h_kd * h_d);
-    if (set_head >= 0) {
+    if (set_head >= 0)
+    {
       compensateTht = theta + mapgyro;
-    } else {
+    }
+    else
+    {
       compensateTht = theta - mapgyro;
     }
-    
 
     if ((abs(dx) <= 0.05 && abs(dy) <= 0.05) && abs(h_error) <= gyro_accept + gyro_localizeMargin)
     {
@@ -563,7 +564,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     {
       s_edit = -MAX_SPD;
     }
-    
+
     // Serial.print(h_error);
     // Serial.print("\t");
     // Serial.print(-h_edit);
@@ -581,7 +582,6 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     Serial.print("\t");
     Serial.println(y_glob);
     swerveDrive(s_edit, compensateTht, -h_edit);
-    prev_compenstateTht = compensateTht;
   }
 }
 
