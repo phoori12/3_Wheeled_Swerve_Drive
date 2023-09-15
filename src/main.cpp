@@ -96,6 +96,7 @@ void moveWithDelay(float spd, float dir, float omega, int duration);
 void getRobotPosition();
 void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false);
 float closestAngle(float a, float b);
+void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float kd);
 
 volatile long ENC1_Count = 0;
 volatile long ENC2_Count = 0;
@@ -106,7 +107,7 @@ float pulsePerDeg = 11.377778;
 
 // PID Variables //
 const float p_kp1 = 4.35f, p_ki1 = 0.05f, p_kd1 = 1.40f; // kp 8.00f
-const float p_kp2 = 7.45f, p_ki2 = 0.1f, p_kd2 = 1.32f;
+const float p_kp2 = 7.45f, p_ki2 = 0.15f, p_kd2 = 1.32f;
 const float p_kp3 = 7.50f, p_ki3 = 0.03f, p_kd3 = 1.00f;
 
 float p_edit1, p_error1 = 0, p_preverror1 = 0, p_p1 = 0, p_i1 = 0, p_d1 = 0;
@@ -140,7 +141,7 @@ int swerve_right2 = -3163; // -3200
 int swerve_right3 = -1706; // 2500
 volatile float prev_deg1, prev_deg2, prev_deg3;
 
-int marginError = 15;
+int marginError = 25;
 
 const float DegToPulseConst = 23.3333; // 23.3333f
 const float degToPulseConst_1 = (swerve_off1 - swerve_right1) / 90;
@@ -203,14 +204,14 @@ void setup()
 
   // initialize device
   // initialize device
-  Serial.println(F("Initializing I2C devices..."));
+  // Serial.println(F("Initializing I2C devices..."));
   mpu.initialize();
   pinMode(13, INPUT);
 
   // verify connection
-  Serial.println(F("Testing device connections..."));
-  Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
-
+  // Serial.println(F("Testing device connections..."));
+  // Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
+  mpu.testConnection();
   // Switches Init //
   pinMode(SW_Red, INPUT);
   pinMode(SW_Yel, INPUT);
@@ -254,7 +255,7 @@ void setup()
   spin_drive(1, 0);
   spin_drive(2, 0);
   spin_drive(3, 0);
-  Serial.println("First wheel setup");
+  // Serial.println("First wheel setup");
   while (digitalRead(SW_Bla) == 1) // 1st Swerve
   {
     if (digitalRead(SW_Yel) == 0 && digitalRead(SW_Red) == 1)
@@ -270,7 +271,7 @@ void setup()
       spin_drive(1, 0);
     }
   }
-  Serial.println("Second wheel setup");
+  // Serial.println("Second wheel setup");
   delay(1000);
   while (digitalRead(SW_Bla) == 1) // 2nd Swerve
   {
@@ -287,7 +288,7 @@ void setup()
       spin_drive(2, 0);
     }
   }
-  Serial.println("Third wheel setup");
+  // Serial.println("Third wheel setup");
   delay(1000);
   while (digitalRead(SW_Bla) == 1) // 3rd Swerve
   {
@@ -305,7 +306,7 @@ void setup()
     }
   }
   delay(1000);
-  Serial.println("GO HOME");
+  // Serial.println("GO HOME");
   // Homing before start //
   while (digitalRead(SW_Bla) == 1)
   {
@@ -335,12 +336,11 @@ void setup()
   setDegSwerve(0, 0, 0, 0, 0, 0);
   delay(1000);
 
-  Serial.println("press red");
+  // Serial.println("press red");
   while (digitalRead(SW_Red) == 1)
     ;
   delay(1000);
 
-  Serial.println(F("Initializing DMP..."));
   devStatus = mpu.dmpInitialize();
 
   // supply your own gyro offsets here, scaled for min sensitivity
@@ -361,13 +361,10 @@ void setup()
     Serial.println();
     mpu.PrintActiveOffsets();
     // turn on the DMP, now that it's ready
-    Serial.println(F("Enabling DMP..."));
     mpu.setDMPEnabled(true);
 
     // enable Arduino interrupt detection
-    Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
-    Serial.print(digitalPinToInterrupt(13));
-    Serial.println(F(")..."));
+    digitalPinToInterrupt(13);
     attachInterrupt(digitalPinToInterrupt(13), dmpDataReady, RISING);
     mpuIntStatus = mpu.getIntStatus();
 
@@ -384,15 +381,18 @@ void setup()
     // 1 = initial memory load failed
     // 2 = DMP configuration updates failed
     // (if it's going to break, usually the code will be 1)
-    Serial.print(F("DMP Initialization failed (code "));
-    Serial.print(devStatus);
-    Serial.println(F(")"));
+    // Serial.print(F("DMP Initialization failed (code "));
+    // Serial.print(devStatus);
+    // Serial.println(F(")"));
   }
   while (digitalRead(SW_Bla) == 1)
   {
     gyro_offset = readGyro();
-    Serial.println(gyro_offset);
+    // Serial.println(gyro_offset);
   }
+
+  // stopFlag = true;
+  // stopAll2();
 }
 
 long lasttime1 = 0, lasttime2 = 0, lasttime3 = 0;
@@ -403,74 +403,20 @@ long lasttime_shit = 0;
 uint32_t localizeTime = 0;
 void loop()
 {
-
-  // Serial.println("First wheel setup");
-  // while (digitalRead(SW_Bla) == 1) // 1st Swerve
-  // {
-  //   if (digitalRead(SW_Yel) == 0 && digitalRead(SW_Red) == 1)
-  //   {
-  //     spin_drive(1, -400);
-  //   }
-  //   else if (digitalRead(SW_Yel) == 1 && digitalRead(SW_Red) == 0)
-  //   {
-  //     spin_drive(1, 400);
-  //   }
-  //   else
-  //   {
-  //     spin_drive(1, 0);
-  //   }
-  //   Serial.println(ENC1_Count);
-  // }
-  // Serial.println("Second wheel setup");
-  // delay(1000);
-  // while (digitalRead(SW_Bla) == 1) // 2nd Swerve
-  // {
-  //   if (digitalRead(SW_Yel) == 0 && digitalRead(SW_Red) == 1)
-  //   {
-  //     spin_drive(2, -400);
-  //   }
-  //   else if (digitalRead(SW_Yel) == 1 && digitalRead(SW_Red) == 0)
-  //   {
-  //     spin_drive(2, 400);
-  //   }
-  //   else
-  //   {
-  //     spin_drive(2, 0);
-  //   }
-  //   Serial.println(ENC2_Count);
-  // }
-  // Serial.println("Third wheel setup");
-  // delay(1000);
-  // while (digitalRead(SW_Bla) == 1) // 3rd Swerve
-  // {
-  //   if (digitalRead(SW_Yel) == 0 && digitalRead(SW_Red) == 1)
-  //   {
-  //     spin_drive(3, -400);
-  //   }
-  //   else if (digitalRead(SW_Yel) == 1 && digitalRead(SW_Red) == 0)
-  //   {
-  //     spin_drive(3, 400);
-  //   }
-  //   else
-  //   {
-  //     spin_drive(3, 0);
-  //   }
-  //   Serial.println(ENC3_Count);
-  // }
-  // delay(1000);
-  p2ptrack(0, 0.5, 0);
+  for (int i = 0; i <= 360; i += 30)
+  {
+    float x = ceil(cos(degToRad(i)) * 100) / 100;
+    float y = ceil(sin(degToRad(i)) * 100) / 100;
+    if (i == 0 || i == 360)
+    {
+      p2ptrack(x, y, 0, false);
+    }
+    else
+    {
+      p2ptrack(x, y, i, true);
+    }
+  }
   stopAll2();
-  delay(1000);
-  p2ptrack(0.5, 0.5, 0);
-  stopAll2();
-  delay(1000);
-  p2ptrack(0.5, 0, 0);
-  stopAll2();
-  delay(1000);
-  p2ptrack(0, 0, 0);
-  stopAll2();
-  delay(1000);
-  setDegSwerve(90, 90, 90, 0, 0, 0);
   while (1)
   {
     stopFlag = true;
@@ -483,6 +429,20 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
   static bool onPoint = false;
   static float theta = 0;
   set_head = -set_head;
+
+  if (abs(set_head) > 180.0f)
+  {
+    int signum = 0;
+    if (set_head > 0)
+      signum = 1;
+    if (set_head < 0)
+      signum = -1;
+    if (set_head == 0)
+      signum = 0;
+
+    set_head = -(signum * 360) + set_head;
+  }
+
   while (1)
   {
     getRobotPosition();
@@ -576,14 +536,14 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     // Serial.print(-h_edit);
     // Serial.print("\t");
     // Serial.println(gyro_pos);
-    Serial.print(theta);
-    Serial.print("\t");
-    Serial.print(s_edit);
-    Serial.print("\t");
-    Serial.print(compensateTht);
-    Serial.print("\t");
-    Serial.print(-h_edit);
-    Serial.print("\t");
+    // Serial.print(theta);
+    // Serial.print("\t");
+    // Serial.print(s_edit);
+    // Serial.print("\t");
+    // Serial.print(compensateTht);
+    // Serial.print("\t");
+    // Serial.print(-h_edit);
+    // Serial.print("\t");
     Serial.print(x_glob);
     Serial.print("\t");
     Serial.println(y_glob);
@@ -615,23 +575,7 @@ void getRobotPosition()
   last_od1 = od1_now;
   last_od2 = od2_now;
   last_od3 = od3_now;
-  // get each Swerve's degree
-  // actual_deg1 = (swerve_off1 - swerve_deg1) / DegToPulseConst;
-  // actual_deg2 = (swerve_off2 - swerve_deg2) / DegToPulseConst;
-  // actual_deg3 = (swerve_off3 - swerve_deg3) / DegToPulseConst;
 
-  //
-  // Serial.print(od1);
-  // Serial.print("\t");
-  // Serial.print(od2);
-  // Serial.print("\t");
-  // Serial.print(od3);
-  // Serial.print(" || ");
-  // Serial.print(actual_deg1);
-  // Serial.print("\t");
-  // Serial.print(actual_deg2);
-  // Serial.print("\t");
-  // Serial.println(actual_deg3);
   // Localization Equation Here
   static float vx, vy, v1x, v2x, v3x, v1y, v2y, v3y;
   v1x = od1 * cos(degToRad(actual_deg1));
@@ -782,7 +726,7 @@ void priorityDegPosCon(int pulse1, int pulse2, int pulse3)
     {
       last = millis();
 
-      if (abs(ENC1_Count - swerve_deg1) > 2)
+      if (abs(ENC1_Count - swerve_deg1) > marginError)
       {
         p_error1 = swerve_deg1 - ENC1_Count;
       }
@@ -807,7 +751,7 @@ void priorityDegPosCon(int pulse1, int pulse2, int pulse3)
       }
       spin_drive(1, p_edit1);
 
-      if (abs(ENC2_Count - swerve_deg2) > 2)
+      if (abs(ENC2_Count - swerve_deg2) > marginError)
       {
         p_error2 = swerve_deg2 - ENC2_Count;
       }
@@ -832,7 +776,7 @@ void priorityDegPosCon(int pulse1, int pulse2, int pulse3)
       }
       spin_drive(2, p_edit2);
 
-      if (abs(ENC3_Count - swerve_deg3) > 2)
+      if (abs(ENC3_Count - swerve_deg3) > marginError)
       {
         p_error3 = swerve_deg3 - ENC3_Count;
       }
@@ -1162,11 +1106,11 @@ void homeTheta()
   {
     spin_drive(2, 650);
   }
-  spin_drive(2, -200);
+  spin_drive(2, -350);
   delay(500);
   while (digitalRead(prox_2) == 0)
   {
-    spin_drive(2, 200);
+    spin_drive(2, 350);
   }
   spin_drive(2, 0);
   ////////////////////
@@ -1496,4 +1440,241 @@ void headingControl(float spd, float course, float set_head)
   h_edit = h_p + h_d;
   // Serial.println(h_edit);
   swerveDrive(spd, course, -h_edit, 0);
+}
+
+void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float kd)
+{
+
+  // const float p_kp1 = 4.35f, p_ki1 = 0.05f, p_kd1 = 1.40f; // kp 8.00f
+  // const float p_kp2 = 7.45f, p_ki2 = 0.15f, p_kd2 = 1.32f;
+  // const float p_kp3 = 7.50f, p_ki3 = 0.03f, p_kd3 = 1.00f;
+  stopFlag = true;
+  float edit, error = 0, preverror = 0, p = 0, i = 0, d = 0;
+
+  long targetTime = 500;
+  bool atTarget = false;
+  uint32_t last = millis();
+
+  if (swerveNo == 1)
+  {
+    swerve_deg1 = swerve_off1 - (setpoint_deg * degToPulseConst_1);
+  }
+  else if (swerveNo == 2)
+  {
+    swerve_deg2 = swerve_off2 - (setpoint_deg * degToPulseConst_2);
+  }
+  else
+  {
+    swerve_deg3 = swerve_off3 - (setpoint_deg * degToPulseConst_3);
+  }
+
+  while (digitalRead(SW_Red) == 1)
+  {
+    if (millis() - last >= looptime)
+    {
+      last = millis();
+
+      if (swerveNo == 1)
+      {
+        if (abs(ENC1_Count - swerve_deg1) > marginError)
+        {
+          error = swerve_deg1 - ENC1_Count;
+        }
+        else
+        {
+          error = 0;
+        }
+      }
+      else if (swerveNo == 2)
+      {
+        if (abs(ENC2_Count - swerve_deg2) > marginError)
+        {
+          error = swerve_deg2 - ENC2_Count;
+        }
+        else
+        {
+          error = 0;
+        }
+      }
+      else
+      {
+        if (abs(ENC3_Count - swerve_deg3) > marginError)
+        {
+          error = swerve_deg3 - ENC3_Count;
+        }
+        else
+        {
+          error = 0;
+        }
+      }
+
+      Serial.print(error);
+      Serial.print(",");
+      Serial.println(0);
+
+      p = kp * error;
+      i += error;
+      i = constrain(i, -2046, 2046);
+      d = (error - preverror) * kd;
+      preverror = error;
+      edit = p + (i * ki) + d;
+      if (p_edit1 > 1000)
+      {
+        edit = 1000;
+      }
+      else if (p_edit1 < -1000)
+      {
+        edit = -1000;
+      }
+
+      if (swerveNo == 1)
+      {
+        spin_drive(1, edit);
+      }
+      else if (swerveNo == 2)
+      {
+        spin_drive(2, edit);
+      }
+      else
+      {
+        spin_drive(3, edit);
+      }
+
+      if (abs(error) < marginError)
+      {
+        if (atTarget == false)
+        {
+          targetTime = millis();
+        }
+        atTarget = true;
+        if (millis() - targetTime > 500)
+        {
+          stopAll2();
+          stopFlag = false;
+          break;
+        }
+      }
+      else
+      {
+        atTarget = false;
+      }
+    }
+  }
+}
+
+void getGraph()
+{
+  // 1st kit
+  tuneSwerveKit(1, 240, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(1, 0, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(1, 240, p_kp1, 0, 0);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(1, 0, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(1, 240, p_kp1, 0, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(1, 0, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  // 2nd kit
+
+  tuneSwerveKit(2, 240, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(2, 0, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(2, 240, p_kp1, 0, 0);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(2, 0, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(2, 240, p_kp1, 0, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(2, 0, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+
+  // 3rd kit
+  tuneSwerveKit(3, 240, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(3, 0, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(3, 240, p_kp1, 0, 0);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(3, 0, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(3, 240, p_kp1, 0, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(3, 0, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
 }
