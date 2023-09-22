@@ -408,10 +408,9 @@ bool safeMode = true;
 void loop()
 {
 
+  // crab circle
 
-  // crab
-
-    for (int i = 0; i <= 360; i += 20)
+  for (int i = 0; i <= 360; i += 20)
   {
     float x = ceil(cos(degToRad(i)) * 100) / 100;
     float y = ceil(sin(degToRad(i)) * 100) / 100;
@@ -425,6 +424,7 @@ void loop()
     }
   }
 
+  // snake centric circle
   // for (int i = 0; i <= 360; i += 20)
   // {
   //   float x = ceil(cos(degToRad(i)) * 100) / 100;
@@ -438,7 +438,10 @@ void loop()
   //     p2ptrack(y, -x, i, true);
   //   }
   // }
+
   stopAll2();
+
+  // Triangular Move
   // p2ptrack(1, 2, 0);
   // stopAll2();
   // delay(500);
@@ -451,8 +454,8 @@ void loop()
   // gyro_offset = gyro_pos;
   // p2ptrack(0, 0, 0);
   // stopAll2();
-  // setDegSwerve(0, 0, 0, 0, 0, 0);
-  // delay(1000);
+  setDegSwerve(0, 0, 0, 0, 0, 0);
+  delay(1000);  
   while (1)
   {
     stopFlag = true;
@@ -502,12 +505,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
       h_error = 0;
     }
     float h_checkCompensate = closestAngle(h_preverror, h_error);
-    // if (h_error >= 0) {
-        h_error = h_preverror + h_checkCompensate;
-    // } else {
-    //   h_error = h_preverror - h_checkCompensate;
-    // }
-    
+    h_error = h_preverror + h_checkCompensate;
 
     h_p = h_kp * h_error;
     h_d = (h_error - h_preverror) * h_kd;
@@ -533,7 +531,6 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     }
 
     s_edit = (s_error * s_kp) + (d_i * s_ki) + (s_kd * d_s);
-    // h_edit = (h_error * h_kp) + (h_i * h_ki) + (h_kd * h_d);
     if (set_head >= 0)
     {
       compensateTht = theta + mapgyro;
@@ -553,9 +550,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
       onPoint = true;
       if (millis() - p2pTargetTime > 500 || viaMode)
       {
-        // atTarget = true;
         sendCmd(0, 0, 0);
-        // Serial.println("Break");
         break;
       }
     }
@@ -642,12 +637,6 @@ void getRobotPosition()
   Serial.print(y_glob);
   Serial.print(",");
   Serial.println(gyro_pos);
-  // Serial.print(gyro_pos);
-  // Serial.print("\t");
-  // Serial.print(x_glob);
-  // Serial.print("\t");
-  // Serial.println(y_glob);
-  ///////////////////////////////
 }
 
 void moveWithDelay(float spd, float dir, float head, int duration)
@@ -867,9 +856,7 @@ void priorityDegPosCon(int pulse1, int pulse2, int pulse3)
     {
       atTarget = false;
     }
-    // Serial.println("still here");
   }
-  // Serial.println("done");
 }
 
 float degToRad(float val)
@@ -1057,9 +1044,7 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
     negMul_3 = true;
     deg3 = prev_deg3 + checkdeg3_flipped;
   }
-  // deg1 = prev_deg1 + checkdeg1;
-  // deg2 = prev_deg2 + checkdeg2;
-  // deg3 = prev_deg3 + checkdeg3;
+
   if (safeMode)
   {
     if (deg1 >= 360)
