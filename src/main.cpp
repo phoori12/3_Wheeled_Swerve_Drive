@@ -97,6 +97,7 @@ void getRobotPosition();
 void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false);
 float closestAngle(float a, float b);
 void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float kd);
+void printPos();
 
 volatile long ENC1_Count = 0;
 volatile long ENC2_Count = 0;
@@ -151,6 +152,7 @@ const float degToPulseConst_3 = (swerve_off3 - swerve_right3) / 90;
 IntervalTimer subroutine_posCon1;
 IntervalTimer subroutine_posCon2;
 IntervalTimer subroutine_posCon3;
+// IntervalTimer subroutine_printPos;
 
 uint32_t readCountTime;
 uint32_t sendSpeedTime;
@@ -332,6 +334,7 @@ void setup()
   subroutine_posCon1.begin(degAdj1_posCon, 1000);
   subroutine_posCon2.begin(degAdj2_posCon, 1000);
   subroutine_posCon3.begin(degAdj3_posCon, 1000);
+  // subroutine_printPos.begin(printPos, 10000);
 
   setDegSwerve(0, 0, 0, 0, 0, 0);
   delay(1000);
@@ -401,9 +404,14 @@ uint32_t looptime = 1;
 long lasttime_shit = 0;
 
 uint32_t localizeTime = 0;
+bool safeMode = true;
 void loop()
 {
-  for (int i = 0; i <= 360; i += 30)
+
+
+  // crab
+
+    for (int i = 0; i <= 360; i += 20)
   {
     float x = ceil(cos(degToRad(i)) * 100) / 100;
     float y = ceil(sin(degToRad(i)) * 100) / 100;
@@ -413,10 +421,38 @@ void loop()
     }
     else
     {
-      p2ptrack(x, y, i, true);
+      p2ptrack(x, y, 0, true);
     }
   }
+
+  // for (int i = 0; i <= 360; i += 20)
+  // {
+  //   float x = ceil(cos(degToRad(i)) * 100) / 100;
+  //   float y = ceil(sin(degToRad(i)) * 100) / 100;
+  //   if (i == 0 || i == 360)
+  //   {
+  //     p2ptrack(y, -x, 0, false);
+  //   }
+  //   else
+  //   {
+  //     p2ptrack(y, -x, i, true);
+  //   }
+  // }
   stopAll2();
+  // p2ptrack(1, 2, 0);
+  // stopAll2();
+  // delay(500);
+  // float gyro_pos = readGyro();
+  // gyro_offset = gyro_pos;
+  // p2ptrack(2, 0, 0);
+  // stopAll2();
+  // delay(500);
+  // gyro_pos = readGyro();
+  // gyro_offset = gyro_pos;
+  // p2ptrack(0, 0, 0);
+  // stopAll2();
+  // setDegSwerve(0, 0, 0, 0, 0, 0);
+  // delay(1000);
   while (1)
   {
     stopFlag = true;
@@ -466,7 +502,12 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
       h_error = 0;
     }
     float h_checkCompensate = closestAngle(h_preverror, h_error);
-    h_error = h_preverror + h_checkCompensate;
+    // if (h_error >= 0) {
+        h_error = h_preverror + h_checkCompensate;
+    // } else {
+    //   h_error = h_preverror - h_checkCompensate;
+    // }
+    
 
     h_p = h_kp * h_error;
     h_d = (h_error - h_preverror) * h_kd;
@@ -514,7 +555,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
       {
         // atTarget = true;
         sendCmd(0, 0, 0);
-        Serial.println("Break");
+        // Serial.println("Break");
         break;
       }
     }
@@ -544,9 +585,9 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     // Serial.print("\t");
     // Serial.print(-h_edit);
     // Serial.print("\t");
-    Serial.print(x_glob);
-    Serial.print("\t");
-    Serial.println(y_glob);
+    // Serial.print(x_glob);
+    // Serial.print("\t");
+    // Serial.println(y_glob);
     swerveDrive(s_edit, compensateTht, -h_edit);
   }
 }
@@ -596,6 +637,11 @@ void getRobotPosition()
   x_glob += (x_frame * cos(degToRad(gyro_pos)) - y_frame * sin(degToRad(gyro_pos)));
   y_glob += (x_frame * sin(degToRad(gyro_pos)) + y_frame * cos(degToRad(gyro_pos)));
 
+  Serial.print(x_glob);
+  Serial.print(",");
+  Serial.print(y_glob);
+  Serial.print(",");
+  Serial.println(gyro_pos);
   // Serial.print(gyro_pos);
   // Serial.print("\t");
   // Serial.print(x_glob);
@@ -823,7 +869,7 @@ void priorityDegPosCon(int pulse1, int pulse2, int pulse3)
     }
     // Serial.println("still here");
   }
-  Serial.println("done");
+  // Serial.println("done");
 }
 
 float degToRad(float val)
@@ -1014,34 +1060,35 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
   // deg1 = prev_deg1 + checkdeg1;
   // deg2 = prev_deg2 + checkdeg2;
   // deg3 = prev_deg3 + checkdeg3;
+  if (safeMode)
+  {
+    if (deg1 >= 360)
+    {
+      deg1 -= 360;
+    }
+    else if (deg1 <= -360)
+    {
+      deg1 += 360;
+    }
 
-  if (deg1 >= 360)
-  {
-    deg1 -= 360;
-  }
-  else if (deg1 <= -360)
-  {
-    deg1 += 360;
-  }
+    if (deg2 >= 360)
+    {
+      deg2 -= 360;
+    }
+    else if (deg2 <= -360)
+    {
+      deg2 += 360;
+    }
 
-  if (deg2 >= 360)
-  {
-    deg2 -= 360;
+    if (deg3 >= 360)
+    {
+      deg3 -= 360;
+    }
+    else if (deg3 <= -360)
+    {
+      deg3 += 360;
+    }
   }
-  else if (deg2 <= -360)
-  {
-    deg2 += 360;
-  }
-
-  if (deg3 >= 360)
-  {
-    deg3 -= 360;
-  }
-  else if (deg3 <= -360)
-  {
-    deg3 += 360;
-  }
-
   actual_deg1 = deg1;
   actual_deg2 = deg2;
   actual_deg3 = deg3;
@@ -1054,14 +1101,7 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
   float gradUnterscheid_2 = abs(abs(prev_swerve_deg2) - abs(swerve_deg2));
   float gradUnterscheid_3 = abs(abs(prev_swerve_deg3) - abs(swerve_deg3));
 
-  // Serial.print(checkdeg1);
-  // Serial.print("\t");
-  // Serial.print(checkdeg2);
-  // Serial.print("\t");
-  // Serial.print(checkdeg3);
-  // Serial.print("\t");
-
-  if (gradUnterscheid_1 > 1050 || gradUnterscheid_2 > 1050 || gradUnterscheid_3 > 1050)
+  if (gradUnterscheid_1 > 2100 || gradUnterscheid_2 > 2100 || gradUnterscheid_3 > 2100) // 1050
   {
     sendCmd(0, 0, 0);
     stopFlag = true;
@@ -1398,28 +1438,6 @@ float readGyro()
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
     // Serial.print("ypr\t");
     return ypr[0] * 180 / M_PI;
-    // Serial.print(ypr[0] * 180 / M_PI);
-    // Serial.print("\t");
-    // Serial.print(ypr[1] * 180 / M_PI);
-    // Serial.print("\t");
-    // Serial.print(ypr[2] * 180 / M_PI);
-    /*
-      mpu.dmpGetAccel(&aa, fifoBuffer);
-      Serial.print("\tRaw Accl XYZ\t");
-      Serial.print(aa.x);
-      Serial.print("\t");
-      Serial.print(aa.y);
-      Serial.print("\t");
-      Serial.print(aa.z);
-      mpu.dmpGetGyro(&gy, fifoBuffer);
-      Serial.print("\tRaw Gyro XYZ\t");
-      Serial.print(gy.x);
-      Serial.print("\t");
-      Serial.print(gy.y);
-      Serial.print("\t");
-      Serial.print(gy.z);
-    */
-    // Serial.println();
   }
 }
 
@@ -1677,4 +1695,15 @@ void getGraph()
     stopAll2();
   }
   delay(1000);
+}
+
+void printPos()
+{
+  getRobotPosition();
+  float gyro_pos = -(readGyro() - gyro_offset);
+  Serial.print(x_glob);
+  Serial.print(",");
+  Serial.print(y_glob);
+  Serial.print(",");
+  Serial.println(gyro_pos);
 }
