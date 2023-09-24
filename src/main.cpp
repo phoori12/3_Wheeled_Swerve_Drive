@@ -40,7 +40,7 @@ struct bno055_euler myEulerData; // Structure to hold the Euler data
 unsigned long lastTime_gyroRead = 0;
 float gyro_now = 0;
 
-float gyro_accept = 2.50f;
+float gyro_accept = 0.50f;
 float gyro_offset = 0.00f;
 float gyro_localizeMargin = 3.00f;
 
@@ -146,13 +146,13 @@ volatile float x_frame, y_frame, x_glob = 0, y_glob = 0;
 float mapgyro;
 float d_i = 0;
 const float s_kp = 10.0f, s_ki = 0.20f, s_kd = 4.0f;
-const float h_kp = 3.00f, h_ki = 0.00f, h_kd = 1.00f;
+const float h_kp = 2.50f, h_ki = 0.00f, h_kd = 1.25f;
 float dx, dy, dsm, s_error, d_s, s_edit, compensateTht;
 float h_edit, h_error = 0, h_preverror = 0, h_p = 0, h_i = 0, h_d = 0;
 long p2pTargetTime = 0;
 ////////////////////////////////////////////////////////////
 
-#define MAX_SPD 20
+#define MAX_SPD 10
 
 union packed_int
 {
@@ -313,7 +313,7 @@ void setup()
   subroutine_posCon3.begin(degAdj3_posCon, 1000);
   // subroutine_printPos.begin(printPos, 10000);
 
-  setDegSwerve(0, 0, 0, 0, 0, 0);
+  setDegSwerve(90, 90, 90, 0, 0, 0);
   delay(1000);
 
   // Serial.println("press red");
@@ -358,20 +358,20 @@ void loop()
   // }
 
   // snake circle
-  for (int i = 0; i <= 360; i += 20)
-  {
-    float x = ceil(0.5 * cos(degToRad(i)) * 100) / 100;
-    float y = ceil(0.5 * sin(degToRad(i)) * 100) / 100;
-    if (i == 0 || i == 360)
-    {
-      p2ptrack(x, y, 0, false);
-    }
-    else
-    {
-      p2ptrack(x, y, i, true);
-    }
-    //Serial.println(i);
-  }
+  // for (int i = 0; i <= 360; i += 20)
+  // {
+  //   float x = ceil(0.5 * cos(degToRad(i)) * 100) / 100;
+  //   float y = ceil(0.5 * sin(degToRad(i)) * 100) / 100;
+  //   if (i == 0 || i == 360)
+  //   {
+  //     p2ptrack(x, y, 0, false);
+  //   }
+  //   else
+  //   {
+  //     p2ptrack(x, y, i, true);
+  //   }
+  //   //Serial.println(i);
+  // }
 
   // centric circle
   // for (int i = 0; i <= 360; i += 20)
@@ -395,15 +395,35 @@ void loop()
   // swerveDrive(20, 90, -20);
   // delay(2000);
 
-  // Triangular Move
-  p2ptrack(0, 0, 0); // 1 2 0
+  p2ptrack(0, 2, 0);
   stopAll2();
-  delay(500);
-  // p2ptrack(0.5, 0, 0); // 2 0 0
+  while (digitalRead(SW_Yel) == 1)
+  delay(1000);
+
+  // Square Move
+  // p2ptrack(0, 2, 0); // 1 2 0
+  // stopAll2();
+  // delay(500);
+  // p2ptrack(1, 2, 0); // 2 0 0
+  // stopAll2();
+  // delay(500);
+  // p2ptrack(1, 0, 0);
   // stopAll2();
   // delay(500);
   // p2ptrack(0, 0, 0);
   // stopAll2();
+
+
+  // Triangular Move
+  // p2ptrack(0, 2, 0); // 1 2 0
+  // stopAll2();
+  // delay(500);
+  // p2ptrack(1, 2, 0); // 2 0 0
+  // stopAll2();
+  // delay(500);
+  // p2ptrack(0, 0, 0);
+  // stopAll2();
+  // delay(500);
   setDegSwerve(0, 0, 0, 0, 0, 0);
   delay(1000);
   while (1)
@@ -1102,7 +1122,7 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
   float gradUnterscheid_2 = abs(abs(prev_swerve_deg2) - abs(swerve_deg2));
   float gradUnterscheid_3 = abs(abs(prev_swerve_deg3) - abs(swerve_deg3));
 
-  if (gradUnterscheid_1 > 2100 || gradUnterscheid_2 > 2100 || gradUnterscheid_3 > 2100) // 1050
+  if (gradUnterscheid_1 > 1050 || gradUnterscheid_2 > 1050 || gradUnterscheid_3 > 1050) // 1050
   {
     sendCmd(0, 0, 0);
     stopFlag = true;
