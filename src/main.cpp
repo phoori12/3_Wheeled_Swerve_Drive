@@ -30,42 +30,16 @@
 #define SW_Bla 12
 
 //////////////////////////////// GYRO Shit ////////////////////////////////
-
-#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+#include <BNO055_support.h>
 #include <Wire.h>
-#endif
-bool blinkState = false;
 
-// MPU control/status vars
-bool dmpReady = false;  // set true if DMP init was successful
-uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
-uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
-uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
-uint16_t fifoCount;     // count of all bytes currently in FIFO
-uint8_t fifoBuffer[64]; // FIFO storage buffer
+//This structure contains the details of the BNO055 device that is connected. (Updated after initialization)
+struct bno055_t myBNO;
+struct bno055_euler myEulerData; //Structure to hold the Euler data
 
-// orientation/motion vars
-Quaternion q;        // [w, x, y, z]         quaternion container
-VectorInt16 aa;      // [x, y, z]            accel sensor measurements
-VectorInt16 aaReal;  // [x, y, z]            gravity-free accel sensor measurements
-VectorInt16 aaWorld; // [x, y, z]            world-frame accel sensor measurements
-VectorFloat gravity; // [x, y, z]            gravity vector
-float euler[3];      // [psi, theta, phi]    Euler angle container
-float ypr[3];        // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
+unsigned long lastTime_gyroRead = 0;
+float gyro_now = 0;
 
-// packet structure for InvenSense teapot demo
-uint8_t teapotPacket[14] = {'$', 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x00, '\r', '\n'};
-
-// ================================================================
-// ===               INTERRUPT DETECTION ROUTINE                ===
-// ================================================================
-
-volatile bool mpuInterrupt = false; // indicates whether MPU interrupt pin has gone high
-void dmpDataReady()
-{
-  mpuInterrupt = true;
-}
-MPU6050 mpu;
 float gyro_accept = 3.00f;
 float gyro_offset = 0.00f;
 float gyro_localizeMargin = 3.00f;
@@ -98,6 +72,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false);
 float closestAngle(float a, float b);
 void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float kd);
 void printPos();
+float mapDeg(float deg);
 
 volatile long ENC1_Count = 0;
 volatile long ENC2_Count = 0;
@@ -196,8 +171,18 @@ union packed_uint
 void setup()
 {
   // Gyro Init //
+  pinMode(13, OUTPUT);
+  digitalWrite(13, HIGH); // BNO RESET PIN
+
   Wire.begin();
-  Wire.setClock(400000);
+  delay(2000);
+  //Initialization of the BNO055
+  BNO_Init(&myBNO); //Assigning the structure to hold information about the device
+
+  //Configuration to NDoF mode
+  bno055_set_operation_mode(OPERATION_MODE_NDOF);
+
+  delay(10);
 
   Serial.begin(9600);
   Serial5.begin(115200); // motor 1
@@ -205,15 +190,8 @@ void setup()
   Serial3.begin(115200); // motor 3
 
   // initialize device
-  // initialize device
-  // Serial.println(F("Initializing I2C devices..."));
-  mpu.initialize();
-  pinMode(13, INPUT);
+  
 
-  // verify connection
-  // Serial.println(F("Testing device connections..."));
-  // Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
-  mpu.testConnection();
   // Switches Init //
   pinMode(SW_Red, INPUT);
   pinMode(SW_Yel, INPUT);
@@ -344,56 +322,12 @@ void setup()
     ;
   delay(1000);
 
-  devStatus = mpu.dmpInitialize();
-
-  // supply your own gyro offsets here, scaled for min sensitivity
-  mpu.setXGyroOffset(29);
-  mpu.setYGyroOffset(-25);
-  mpu.setZGyroOffset(58);
-
-  mpu.setXAccelOffset(-5210);
-  mpu.setYAccelOffset(-54);
-  mpu.setZAccelOffset(1738);
-
-  // make sure it worked (returns 0 if so)
-  if (devStatus == 0)
-  {
-    // Calibration Time: generate offsets and calibrate our MPU6050
-    mpu.CalibrateAccel(6);
-    mpu.CalibrateGyro(6);
-    Serial.println();
-    mpu.PrintActiveOffsets();
-    // turn on the DMP, now that it's ready
-    mpu.setDMPEnabled(true);
-
-    // enable Arduino interrupt detection
-    digitalPinToInterrupt(13);
-    attachInterrupt(digitalPinToInterrupt(13), dmpDataReady, RISING);
-    mpuIntStatus = mpu.getIntStatus();
-
-    // set our DMP Ready flag so the main loop() function knows it's okay to use it
-    Serial.println(F("DMP ready! Waiting for first interrupt..."));
-    dmpReady = true;
-
-    // get expected DMP packet size for later comparison
-    packetSize = mpu.dmpGetFIFOPacketSize();
-  }
-  else
-  {
-    // ERROR!
-    // 1 = initial memory load failed
-    // 2 = DMP configuration updates failed
-    // (if it's going to break, usually the code will be 1)
-    // Serial.print(F("DMP Initialization failed (code "));
-    // Serial.print(devStatus);
-    // Serial.println(F(")"));
-  }
-  while (digitalRead(SW_Bla) == 1)
-  {
-    gyro_offset = readGyro();
-    // Serial.println(gyro_offset);
-  }
-
+  // Get Gyro Offset ..
+  bno055_read_euler_hrp(&myEulerData);
+  float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
+  gyro_offset = gyro_read;
+  Serial.print("Heading(Yaw): ");       //To read out the Heading (Yaw)
+  Serial.println(float(myEulerData.h) / 16.00);   //Convert to degrees
   // stopFlag = true;
   // stopAll2();
 }
@@ -409,20 +343,20 @@ void loop()
 {
 
   // crab circle
-
-  for (int i = 0; i <= 360; i += 20)
-  {
-    float x = ceil(cos(degToRad(i)) * 100) / 100;
-    float y = ceil(sin(degToRad(i)) * 100) / 100;
-    if (i == 0 || i == 360)
-    {
-      p2ptrack(x, y, 0, false);
-    }
-    else
-    {
-      p2ptrack(x, y, 0, true);
-    }
-  }
+  //headingControl(20, 90, 0);
+  // for (int i = 0; i <= 360; i += 20)
+  // {
+  //   float x = ceil(cos(degToRad(i)) * 100) / 100;
+  //   float y = ceil(sin(degToRad(i)) * 100) / 100;
+  //   if (i == 0 || i == 360)
+  //   {
+  //     p2ptrack(x, y, 0, false);
+  //   }
+  //   else
+  //   {
+  //     p2ptrack(x, y, 0, true);
+  //   }
+  // }
 
   // snake centric circle
   // for (int i = 0; i <= 360; i += 20)
@@ -439,21 +373,17 @@ void loop()
   //   }
   // }
 
-  stopAll2();
+  // stopAll2();
 
   // Triangular Move
-  // p2ptrack(1, 2, 0);
-  // stopAll2();
-  // delay(500);
-  // float gyro_pos = readGyro();
-  // gyro_offset = gyro_pos;
-  // p2ptrack(2, 0, 0);
-  // stopAll2();
-  // delay(500);
-  // gyro_pos = readGyro();
-  // gyro_offset = gyro_pos;
-  // p2ptrack(0, 0, 0);
-  // stopAll2();
+  p2ptrack(0, 0.5, 0); // 1 2 0
+  stopAll2();
+  delay(500);
+  p2ptrack(0.5, 0, 0); // 2 0 0
+  stopAll2();
+  delay(500);
+  p2ptrack(0, 0, 0);
+  stopAll2();
   setDegSwerve(0, 0, 0, 0, 0, 0);
   delay(1000);  
   while (1)
@@ -495,7 +425,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     d_s = s_error - s_prev_error;
     s_prev_error = s_error;
 
-    float gyro_pos = readGyro() - gyro_offset;
+    float gyro_pos = readGyro();
     if (abs(abs(gyro_pos) - set_head) > gyro_accept)
     {
       h_error = gyro_pos - set_head;
@@ -504,8 +434,8 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     {
       h_error = 0;
     }
-    float h_checkCompensate = closestAngle(h_preverror, h_error);
-    h_error = h_preverror + h_checkCompensate;
+    // float h_checkCompensate = closestAngle(h_preverror, h_error);
+    // h_error = h_preverror + h_checkCompensate;
 
     h_p = h_kp * h_error;
     h_d = (h_error - h_preverror) * h_kd;
@@ -628,7 +558,7 @@ void getRobotPosition()
 
   x_frame = vx * xCon;
   y_frame = vy * yCon;
-  float gyro_pos = -(readGyro() - gyro_offset);
+  float gyro_pos = -readGyro();
   x_glob += (x_frame * cos(degToRad(gyro_pos)) - y_frame * sin(degToRad(gyro_pos)));
   y_glob += (x_frame * sin(degToRad(gyro_pos)) + y_frame * cos(degToRad(gyro_pos)));
 
@@ -981,21 +911,24 @@ void degAdj3_posCon()
 float closestAngle(float a, float b)
 {
   float dir = fmod(b, 360) - fmod(a, 360);
+  return mapDeg(dir);
+}
 
-  if (abs(dir) > 180.0f)
+float mapDeg(float deg) {
+  if (abs(deg) > 180.0f)
   {
     int signum = 0;
-    if (dir > 0)
+    if (deg > 0)
       signum = 1;
-    if (dir < 0)
+    if (deg < 0)
       signum = -1;
-    if (dir == 0)
+    if (deg == 0)
       signum = 0;
 
-    dir = -(signum * 360) + dir;
+    deg = -(signum * 360) + deg;
   }
 
-  return dir;
+  return deg;
 }
 
 void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float v3)
@@ -1086,7 +1019,7 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
   float gradUnterscheid_2 = abs(abs(prev_swerve_deg2) - abs(swerve_deg2));
   float gradUnterscheid_3 = abs(abs(prev_swerve_deg3) - abs(swerve_deg3));
 
-  if (gradUnterscheid_1 > 2100 || gradUnterscheid_2 > 2100 || gradUnterscheid_3 > 2100) // 1050
+  if (gradUnterscheid_1 > 1050 || gradUnterscheid_2 > 1050 || gradUnterscheid_3 > 1050) // 1050
   {
     sendCmd(0, 0, 0);
     stopFlag = true;
@@ -1412,23 +1345,20 @@ void serialEvent3() // m3
 
 float readGyro()
 {
-  if (!dmpReady)
-    return;
-  // read a packet from FIFO
-  if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer))
-  { // Get the Latest packet
-    // display Euler angles in degrees
-    mpu.dmpGetQuaternion(&q, fifoBuffer);
-    mpu.dmpGetGravity(&gravity, &q);
-    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-    // Serial.print("ypr\t");
-    return ypr[0] * 180 / M_PI;
+ if ((millis() - lastTime_gyroRead) >= 10) //To stream at 10 Hz without using additional timers
+  {
+    lastTime_gyroRead = millis();
+    bno055_read_euler_hrp(&myEulerData);
+    float gyro_read = mapDeg(float(myEulerData.h) / 16.00); 
+    // Serial.print("Heading(Yaw): ");       //To read out the Heading (Yaw)
+    // Serial.println(gyro_offset - gyro_read);   //Convert to degrees
+    return -(gyro_offset - gyro_read);
   }
 }
 
 void headingControl(float spd, float course, float set_head)
 {
-  float gyro_pos = readGyro() - gyro_offset;
+  float gyro_pos = readGyro();
   if (abs(gyro_pos) - set_head > gyro_accept)
   {
     h_error = gyro_pos - set_head;
@@ -1441,7 +1371,7 @@ void headingControl(float spd, float course, float set_head)
   h_d = (h_error - h_preverror) * h_kd;
   h_preverror = h_error;
   h_edit = h_p + h_d;
-  // Serial.println(h_edit);
+  Serial.println(gyro_pos);
   swerveDrive(spd, course, -h_edit, 0);
 }
 
@@ -1685,7 +1615,7 @@ void getGraph()
 void printPos()
 {
   getRobotPosition();
-  float gyro_pos = -(readGyro() - gyro_offset);
+  float gyro_pos = -readGyro();
   Serial.print(x_glob);
   Serial.print(",");
   Serial.print(y_glob);
