@@ -33,14 +33,14 @@
 #include <BNO055_support.h>
 #include <Wire.h>
 
-//This structure contains the details of the BNO055 device that is connected. (Updated after initialization)
+// This structure contains the details of the BNO055 device that is connected. (Updated after initialization)
 struct bno055_t myBNO;
-struct bno055_euler myEulerData; //Structure to hold the Euler data
+struct bno055_euler myEulerData; // Structure to hold the Euler data
 
 unsigned long lastTime_gyroRead = 0;
 float gyro_now = 0;
 
-float gyro_accept = 3.00f;
+float gyro_accept = 2.50f;
 float gyro_offset = 0.00f;
 float gyro_localizeMargin = 3.00f;
 
@@ -176,10 +176,10 @@ void setup()
 
   Wire.begin();
   delay(2000);
-  //Initialization of the BNO055
-  BNO_Init(&myBNO); //Assigning the structure to hold information about the device
+  // Initialization of the BNO055
+  BNO_Init(&myBNO); // Assigning the structure to hold information about the device
 
-  //Configuration to NDoF mode
+  // Configuration to NDoF mode
   bno055_set_operation_mode(OPERATION_MODE_NDOF);
 
   delay(10);
@@ -190,7 +190,6 @@ void setup()
   Serial3.begin(115200); // motor 3
 
   // initialize device
-  
 
   // Switches Init //
   pinMode(SW_Red, INPUT);
@@ -326,8 +325,8 @@ void setup()
   bno055_read_euler_hrp(&myEulerData);
   float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
   gyro_offset = gyro_read;
-  Serial.print("Heading(Yaw): ");       //To read out the Heading (Yaw)
-  Serial.println(float(myEulerData.h) / 16.00);   //Convert to degrees
+  Serial.print("Heading(Yaw): ");               // To read out the Heading (Yaw)
+  Serial.println(float(myEulerData.h) / 16.00); // Convert to degrees
   // stopFlag = true;
   // stopAll2();
 }
@@ -343,11 +342,11 @@ void loop()
 {
 
   // crab circle
-  //headingControl(20, 90, 0);
+  // headingControl(20, 90, 0);
   // for (int i = 0; i <= 360; i += 20)
   // {
-  //   float x = ceil(cos(degToRad(i)) * 100) / 100;
-  //   float y = ceil(sin(degToRad(i)) * 100) / 100;
+  //   float x = ceil(0.5 * cos(degToRad(i)) * 100) / 100;
+  //   float y = ceil(0.5 * sin(degToRad(i)) * 100) / 100;
   //   if (i == 0 || i == 360)
   //   {
   //     p2ptrack(x, y, 0, false);
@@ -358,11 +357,27 @@ void loop()
   //   }
   // }
 
-  // snake centric circle
+  // snake circle
+  for (int i = 0; i <= 360; i += 20)
+  {
+    float x = ceil(0.5 * cos(degToRad(i)) * 100) / 100;
+    float y = ceil(0.5 * sin(degToRad(i)) * 100) / 100;
+    if (i == 0 || i == 360)
+    {
+      p2ptrack(x, y, 0, false);
+    }
+    else
+    {
+      p2ptrack(x, y, i, true);
+    }
+    //Serial.println(i);
+  }
+
+  // centric circle
   // for (int i = 0; i <= 360; i += 20)
   // {
-  //   float x = ceil(cos(degToRad(i)) * 100) / 100;
-  //   float y = ceil(sin(degToRad(i)) * 100) / 100;
+  //   float x = ceil(0.5 * cos(degToRad(i)) * 100) / 100;
+  //   float y = ceil(0.5 * sin(degToRad(i)) * 100) / 100;
   //   if (i == 0 || i == 360)
   //   {
   //     p2ptrack(y, -x, 0, false);
@@ -371,21 +386,26 @@ void loop()
   //   {
   //     p2ptrack(y, -x, i, true);
   //   }
+  //   // Serial.println(i);
   // }
 
   // stopAll2();
+  // swerveDrive(20, 90, -10);
+  // delay(2000);
+  // swerveDrive(20, 90, -20);
+  // delay(2000);
 
   // Triangular Move
-  p2ptrack(0, 0.5, 0); // 1 2 0
+  p2ptrack(0, 0, 0); // 1 2 0
   stopAll2();
   delay(500);
-  p2ptrack(0.5, 0, 0); // 2 0 0
-  stopAll2();
-  delay(500);
-  p2ptrack(0, 0, 0);
-  stopAll2();
+  // p2ptrack(0.5, 0, 0); // 2 0 0
+  // stopAll2();
+  // delay(500);
+  // p2ptrack(0, 0, 0);
+  // stopAll2();
   setDegSwerve(0, 0, 0, 0, 0, 0);
-  delay(1000);  
+  delay(1000);
   while (1)
   {
     stopFlag = true;
@@ -434,13 +454,14 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     {
       h_error = 0;
     }
-    // float h_checkCompensate = closestAngle(h_preverror, h_error);
-    // h_error = h_preverror + h_checkCompensate;
+    float h_checkCompensate = closestAngle(h_preverror, h_error);
+    h_error = h_preverror + h_checkCompensate;
 
     h_p = h_kp * h_error;
     h_d = (h_error - h_preverror) * h_kd;
     h_preverror = h_error;
     h_edit = h_p + h_d;
+    // Serial.println(h_edit);
 
     if (dx != 0 || dy != 0)
     {
@@ -469,7 +490,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     {
       compensateTht = theta - mapgyro;
     }
-
+    // compensateTht = theta;
     if ((abs(dx) <= 0.05 && abs(dy) <= 0.05) && abs(h_error) <= gyro_accept + gyro_localizeMargin)
     {
 
@@ -508,7 +529,7 @@ void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
     // Serial.print("\t");
     // Serial.print(compensateTht);
     // Serial.print("\t");
-    // Serial.print(-h_edit);
+    // Serial.println(-h_edit);
     // Serial.print("\t");
     // Serial.print(x_glob);
     // Serial.print("\t");
@@ -574,6 +595,10 @@ void moveWithDelay(float spd, float dir, float head, int duration)
   // TODO
 }
 
+float prev_thet1 = 0;
+float prev_thet2 = 0;
+float prev_thet3 = 0;
+
 void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false)
 {
   if (millis() - sendSpeedTime > 10)
@@ -584,12 +609,12 @@ void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false)
     float vw1, vw2, vw3, thet1, thet2, thet3;
     vx = spd * cos(degToRad(dir));
     vy = spd * sin(degToRad(dir));
-    vx1 = omega + vx;
+    vx1 = omega * 0.255 + vx;
     vy1 = vy;
-    vx2 = -omega * sin(degToRad(30)) + vx;
-    vy2 = -omega * sin(degToRad(60)) + vy;
-    vx3 = -omega * sin(degToRad(30)) + vx;
-    vy3 = omega * sin(degToRad(60)) + vy;
+    vx2 = -omega * 0.255 * sin(degToRad(30)) + vx;
+    vy2 = -omega * 0.255 * sin(degToRad(60)) + vy;
+    vx3 = -omega * 0.255 * sin(degToRad(30)) + vx;
+    vy3 = omega * 0.255 * sin(degToRad(60)) + vy;
 
     // TODO Contrain shit
     vw1 = sqrt(pow(vx1, 2) + pow(vy1, 2));
@@ -624,7 +649,7 @@ void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false)
 
     if (vx1 == 0 && vy1 == 0)
     {
-      thet1 = 0;
+      thet1 = prev_thet1;
     }
     else
     {
@@ -633,7 +658,7 @@ void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false)
 
     if (vx2 == 0 && vy2 == 0)
     {
-      thet2 = 0;
+      thet2 = prev_thet2;
     }
     else
     {
@@ -642,7 +667,7 @@ void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false)
 
     if (vx3 == 0 && vy3 == 0)
     {
-      thet3 = 0;
+      thet3 = prev_thet3;
     }
     else
     {
@@ -672,6 +697,9 @@ void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false)
     {
       setDegSwerve(thet1, thet2, thet3, vw1, vw2, vw3);
     }
+    prev_thet1 = actual_deg1;
+    prev_thet2 = actual_deg2;
+    prev_thet3 = actual_deg3;
   }
 }
 
@@ -914,7 +942,8 @@ float closestAngle(float a, float b)
   return mapDeg(dir);
 }
 
-float mapDeg(float deg) {
+float mapDeg(float deg)
+{
   if (abs(deg) > 180.0f)
   {
     int signum = 0;
@@ -982,29 +1011,83 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
   {
     if (deg1 >= 360)
     {
-      deg1 -= 360;
+      if (negMul_1)
+      {
+        deg1 = 360 - (180 + checkdeg1_flipped);
+        negMul_1 = false;
+      }
+      else
+      {
+        deg1 = 360 - (180 + checkdeg1);
+        negMul_1 = true;
+      }
     }
     else if (deg1 <= -360)
     {
-      deg1 += 360;
+      if (negMul_1)
+      {
+        deg1 = -360 + (180 - checkdeg1_flipped);
+        negMul_1 = false;
+      }
+      else
+      {
+        deg1 = -360 + (180 - checkdeg1);
+        negMul_1 = true;
+      }
     }
-
+    /////////////////
     if (deg2 >= 360)
     {
-      deg2 -= 360;
+      if (negMul_2)
+      {
+        deg2 = 360 - (180 + checkdeg2_flipped);
+        negMul_2 = false;
+      }
+      else
+      {
+        deg2 = 360 - (180 + checkdeg2);
+        negMul_2 = true;
+      }
     }
     else if (deg2 <= -360)
     {
-      deg2 += 360;
+      if (negMul_2)
+      {
+        deg2 = -360 + (180 - checkdeg2_flipped);
+        negMul_2 = false;
+      }
+      else
+      {
+        deg2 = -360 + (180 - checkdeg2);
+        negMul_2 = true;
+      }
     }
-
+    //////////////////////
     if (deg3 >= 360)
     {
-      deg3 -= 360;
+      if (negMul_3)
+      {
+        deg3 = 360 - (180 + checkdeg3_flipped);
+        negMul_3 = false;
+      }
+      else
+      {
+        deg3 = 360 - (180 + checkdeg3);
+        negMul_3 = true;
+      }
     }
     else if (deg3 <= -360)
     {
-      deg3 += 360;
+      if (negMul_3)
+      {
+        deg3 = -360 + (180 - checkdeg3_flipped);
+        negMul_3 = false;
+      }
+      else
+      {
+        deg3 = -360 + (180 - checkdeg3);
+        negMul_3 = true;
+      }
     }
   }
   actual_deg1 = deg1;
@@ -1019,7 +1102,7 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
   float gradUnterscheid_2 = abs(abs(prev_swerve_deg2) - abs(swerve_deg2));
   float gradUnterscheid_3 = abs(abs(prev_swerve_deg3) - abs(swerve_deg3));
 
-  if (gradUnterscheid_1 > 1050 || gradUnterscheid_2 > 1050 || gradUnterscheid_3 > 1050) // 1050
+  if (gradUnterscheid_1 > 2100 || gradUnterscheid_2 > 2100 || gradUnterscheid_3 > 2100) // 1050
   {
     sendCmd(0, 0, 0);
     stopFlag = true;
@@ -1030,13 +1113,16 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
     stopFlag = false;
     sendCmd(v1, v2, v3);
   }
-
+  // sendCmd(v1, v2, v3);
   prev_swerve_deg1 = swerve_deg1;
   prev_swerve_deg2 = swerve_deg2;
   prev_swerve_deg3 = swerve_deg3;
   prev_deg1 = deg1;
   prev_deg2 = deg2;
   prev_deg3 = deg3;
+  // Serial.print(negMul_1);
+  // Serial.print("\t");
+  // Serial.println(deg1);
 }
 
 void spinCCW()
@@ -1345,11 +1431,11 @@ void serialEvent3() // m3
 
 float readGyro()
 {
- if ((millis() - lastTime_gyroRead) >= 10) //To stream at 10 Hz without using additional timers
+  if ((millis() - lastTime_gyroRead) >= 10) // To stream at 10 Hz without using additional timers
   {
     lastTime_gyroRead = millis();
     bno055_read_euler_hrp(&myEulerData);
-    float gyro_read = mapDeg(float(myEulerData.h) / 16.00); 
+    float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
     // Serial.print("Heading(Yaw): ");       //To read out the Heading (Yaw)
     // Serial.println(gyro_offset - gyro_read);   //Convert to degrees
     return -(gyro_offset - gyro_read);
