@@ -74,6 +74,19 @@ void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float k
 void printPos();
 float mapDeg(float deg);
 
+String waitForInput();
+void straightCmdExec();
+void circularCmdExec();
+void rectangleCmdExec();
+void triangleCmdExec();
+
+// path fuctions //
+void straightMove(float d);
+void triangleMove(float b, float h, bool r);
+void rectangleMove(float w, float h);
+void fullCircleMove(float r, bool lh);
+void halfCircleMove(float r, bool lh);
+
 volatile long ENC1_Count = 0;
 volatile long ENC2_Count = 0;
 volatile long ENC3_Count = 0;
@@ -313,13 +326,10 @@ void setup()
   subroutine_posCon3.begin(degAdj3_posCon, 1000);
   // subroutine_printPos.begin(printPos, 10000);
 
-  setDegSwerve(90, 90, 90, 0, 0, 0);
+  setDegSwerve(0, 0, 0, 0, 0, 0);
   delay(1000);
 
   // Serial.println("press red");
-  while (digitalRead(SW_Red) == 1)
-    ;
-  delay(1000);
 
   // Get Gyro Offset ..
   bno055_read_euler_hrp(&myEulerData);
@@ -329,6 +339,7 @@ void setup()
   Serial.println(float(myEulerData.h) / 16.00); // Convert to degrees
   // stopFlag = true;
   // stopAll2();
+  Serial.println("Ready to recieve cmd");
 }
 
 long lasttime1 = 0, lasttime2 = 0, lasttime3 = 0;
@@ -340,99 +351,225 @@ uint32_t localizeTime = 0;
 bool safeMode = true;
 void loop()
 {
+  Serial.println("1. Straight Path");
+  Serial.println("2. Triangle");
+  Serial.println("3. Rectangle / Square");
+  Serial.println("4. Circular");
+  String cmd = waitForInput();
 
-  // crab circle
-  // headingControl(20, 90, 0);
-  // for (int i = 0; i <= 360; i += 20)
-  // {
-  //   float x = ceil(0.5 * cos(degToRad(i)) * 100) / 100;
-  //   float y = ceil(0.5 * sin(degToRad(i)) * 100) / 100;
-  //   if (i == 0 || i == 360)
-  //   {
-  //     p2ptrack(x, y, 0, false);
-  //   }
-  //   else
-  //   {
-  //     p2ptrack(x, y, 0, true);
-  //   }
-  // }
+  switch (cmd.toInt())
+  {
+  case 1:
+    straightCmdExec();
+    break;
+  case 2:
+    triangleCmdExec();
+    break;
+  case 3:
+    rectangleCmdExec();
+    break;
+  case 4:
+    circularCmdExec();
+    break;
+  default:
+    Serial.println("Invalid Input");
+    return;
+  }
 
-  // snake circle
-  // for (int i = 0; i <= 360; i += 20)
-  // {
-  //   float x = ceil(0.5 * cos(degToRad(i)) * 100) / 100;
-  //   float y = ceil(0.5 * sin(degToRad(i)) * 100) / 100;
-  //   if (i == 0 || i == 360)
-  //   {
-  //     p2ptrack(x, y, 0, false);
-  //   }
-  //   else
-  //   {
-  //     p2ptrack(x, y, i, true);
-  //   }
-  //   //Serial.println(i);
-  // }
+  Serial.println("CMD Completed");
 
-  // centric circle
-  // for (int i = 0; i <= 360; i += 20)
-  // {
-  //   float x = ceil(0.5 * cos(degToRad(i)) * 100) / 100;
-  //   float y = ceil(0.5 * sin(degToRad(i)) * 100) / 100;
-  //   if (i == 0 || i == 360)
-  //   {
-  //     p2ptrack(y, -x, 0, false);
-  //   }
-  //   else
-  //   {
-  //     p2ptrack(y, -x, i, true);
-  //   }
-  //   // Serial.println(i);
-  // }
-
-  // stopAll2();
-  // swerveDrive(20, 90, -10);
-  // delay(2000);
-  // swerveDrive(20, 90, -20);
-  // delay(2000);
-
-  p2ptrack(0, 2, 0);
-  stopAll2();
-  while (digitalRead(SW_Yel) == 1)
-  delay(1000);
-
-  // Square Move
-  // p2ptrack(0, 2, 0); // 1 2 0
-  // stopAll2();
-  // delay(500);
-  // p2ptrack(1, 2, 0); // 2 0 0
-  // stopAll2();
-  // delay(500);
-  // p2ptrack(1, 0, 0);
-  // stopAll2();
-  // delay(500);
-  // p2ptrack(0, 0, 0);
-  // stopAll2();
-
-
-  // Triangular Move
-  // p2ptrack(0, 2, 0); // 1 2 0
-  // stopAll2();
-  // delay(500);
-  // p2ptrack(1, 2, 0); // 2 0 0
-  // stopAll2();
-  // delay(500);
-  // p2ptrack(0, 0, 0);
-  // stopAll2();
-  // delay(500);
-  
-  setDegSwerve(0, 0, 0, 0, 0, 0);
-  delay(1000);
+  // setDegSwerve(0, 0, 0, 0, 0, 0);
+  // delay(1000);
   while (1)
   {
     stopFlag = true;
     stopAll2();
   }
 }
+void straightMove(float d)
+{
+  setDegSwerve(90, 90, 90, 0, 0, 0);
+  delay(500);
+  while (digitalRead(SW_Red) == 1)
+    ;
+  delay(1000);
+  float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
+  gyro_offset = gyro_read;
+  p2ptrack(0, d, 0);
+  stopAll2();
+}
+
+void triangleMove(float b, float h, bool r)
+{
+  if (r)
+  {
+    setDegSwerve(90, 90, 90, 0, 0, 0);
+  }
+  else
+  {
+    setDegSwerve(0, 0, 0, 0, 0, 0);
+  }
+  delay(500);
+  while (digitalRead(SW_Red) == 1)
+    ;
+  delay(1000);
+  float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
+  gyro_offset = gyro_read;
+  if (r)
+  {
+    p2ptrack(0, h, 0); // 1 2 0
+    stopAll2();
+    delay(500);
+    while (digitalRead(SW_Red) == 1)
+      ;
+    delay(1000);
+    p2ptrack(b, 0, 0); // 2 0 0
+    stopAll2();
+    delay(500);
+    while (digitalRead(SW_Red) == 1)
+      ;
+    delay(1000);
+    p2ptrack(0, 0, 0);
+    stopAll2();
+    delay(500);
+  }
+  else
+  {
+    p2ptrack(b, 0, 0); // 1 2 0
+    stopAll2();
+    delay(500);
+    while (digitalRead(SW_Red) == 1)
+      ;
+    delay(1000);
+    p2ptrack(b / 2, h, 0); // 2 0 0
+    stopAll2();
+    delay(500);
+    while (digitalRead(SW_Red) == 1)
+      ;
+    delay(1000);
+    p2ptrack(0, 0, 0);
+    stopAll2();
+    delay(500);
+  }
+}
+
+void rectangleMove(float w, float h)
+{
+  setDegSwerve(90, 90, 90, 0, 0, 0);
+  delay(500);
+  while (digitalRead(SW_Red) == 1)
+    ;
+  delay(1000);
+  float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
+  gyro_offset = gyro_read;
+  p2ptrack(0, h, 0); // 1 2 0
+  stopAll2();
+  delay(500);
+  while (digitalRead(SW_Red) == 1)
+    ;
+  delay(1000);
+  p2ptrack(w, h, 0); // 2 0 0
+  stopAll2();
+  delay(500);
+  while (digitalRead(SW_Red) == 1)
+    ;
+  delay(1000);
+  p2ptrack(w, 0, 0);
+  stopAll2();
+  delay(500);
+  while (digitalRead(SW_Red) == 1)
+    ;
+  delay(1000);
+  p2ptrack(0, 0, 0);
+  stopAll2();
+}
+
+void fullCircleMove(float r, bool lh)
+{
+  setDegSwerve(0, 0, 0, 0, 0, 0);
+  delay(500);
+  while (digitalRead(SW_Red) == 1)
+    ;
+  delay(1000);
+  float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
+  gyro_offset = gyro_read;
+  if (lh)
+  {
+    for (int i = 0; i <= 360; i += 20)
+    {
+      float x = ceil(r * cos(degToRad(i)) * 100) / 100;
+      float y = ceil(r * sin(degToRad(i)) * 100) / 100;
+      if (i == 0 || i == 360)
+      {
+        p2ptrack(x, y, 0, false);
+      }
+      else
+      {
+        p2ptrack(x, y, 0, true);
+      }
+    }
+  }
+  else
+  {
+    for (int i = 0; i <= 360; i += 20)
+    {
+      float x = ceil(r * cos(degToRad(i)) * 100) / 100;
+      float y = ceil(r * sin(degToRad(i)) * 100) / 100;
+      if (i == 0 || i == 360)
+      {
+        p2ptrack(x, y, 0, false);
+      }
+      else
+      {
+        p2ptrack(x, y, i, true);
+      }
+    }
+  }
+}
+
+void halfCircleMove(float r, bool lh)
+{
+  setDegSwerve(0, 0, 0, 0, 0, 0);
+  delay(500);
+  while (digitalRead(SW_Red) == 1)
+    ;
+  delay(1000);
+  float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
+  gyro_offset = gyro_read;
+  if (lh)
+  {
+    for (int i = 0; i <= 180; i += 20)
+    {
+      float x = ceil(r * cos(degToRad(i)) * 100) / 100;
+      float y = ceil(r * sin(degToRad(i)) * 100) / 100;
+      if (i == 0 || i == 360)
+      {
+        p2ptrack(x, y, 0, false);
+      }
+      else
+      {
+        p2ptrack(x, y, 0, true);
+      }
+    }
+  }
+  else
+  {
+    for (int i = 0; i <= 180; i += 20)
+    {
+      float x = ceil(r * cos(degToRad(i)) * 100) / 100;
+      float y = ceil(r * sin(degToRad(i)) * 100) / 100;
+      if (i == 0 || i == 360)
+      {
+        p2ptrack(x, y, 0, false);
+      }
+      else
+      {
+        p2ptrack(x, y, i, true);
+      }
+    }
+  }
+}
+
 void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false)
 {
   static volatile float s_prev_error = 0.0f;
@@ -1728,4 +1865,124 @@ void printPos()
   Serial.print(y_glob);
   Serial.print(",");
   Serial.println(gyro_pos);
+}
+
+void straightCmdExec()
+{
+  Serial.println("=================================");
+  Serial.println();
+
+  Serial.println("Enter distance (m) :");
+  straightMove(waitForInput().toFloat());
+}
+
+void circularCmdExec()
+{
+  Serial.println("=================================");
+  Serial.println();
+  Serial.println("1. Full Circle Locked Heading");
+  Serial.println("2. Half Circle Locked Heading");
+  Serial.println("3. Full Circle Tangent Heading");
+  Serial.println("4. Half Circle Tangent Heading");
+  String cmd = waitForInput();
+  float rad;
+  Serial.println("=================================");
+  Serial.println();
+  Serial.println("Enter Radius (m) :");
+  rad = waitForInput().toFloat(); // will be rounded to 2 decimal degits
+  switch (cmd.toInt())
+  {
+  case 1:
+    Serial.println("Course Set for Full Circle Locked Heading");
+    fullCircleMove(rad, true);
+    break;
+  case 2:
+    Serial.println("Course Set for Half Circle Locked Heading");
+    halfCircleMove(rad, true);
+    break;
+  case 3:
+    Serial.println("Course Set for Full Circle Tangent Heading");
+    fullCircleMove(rad, false);
+    break;
+  case 4:
+    Serial.println("Course Set for Half Circle Tangent Heading");
+    halfCircleMove(rad, false);
+    break;
+  default:
+    Serial.println("Invalid Input");
+    return;
+  }
+}
+
+void rectangleCmdExec()
+{
+  float wd, hg;
+  Serial.println("=================================");
+  Serial.println();
+  Serial.println("Enter Width (m) :");
+  wd = waitForInput().toFloat(); // will be rounded to 2 decimal degits
+  Serial.println("Enter Height (m)");
+  hg = waitForInput().toFloat(); // will be rounded to 2 decimal degits
+  Serial.println("Rectagle / Square Path Set!");
+  rectangleMove(wd, hg);
+}
+
+void triangleCmdExec()
+{
+  Serial.println("=================================");
+  Serial.println();
+  Serial.println("1. Normal Triangle");
+  Serial.println("2. Right Triangle");
+  String cmd = waitForInput();
+  float bs, hg;
+  Serial.println("=================================");
+  Serial.println();
+  switch (cmd.toInt())
+  {
+  case 1:
+    Serial.println("Enter Base Length (m) :");
+    bs = waitForInput().toFloat(); // will be rounded to 2 decimal degits
+    Serial.println("Enter Height Length (m)");
+    hg = waitForInput().toFloat(); // will be rounded to 2 decimal degits
+    Serial.println("Course Set for Normal Triangle");
+    triangleMove(bs, hg, false);
+    break;
+  case 2:
+    Serial.println("Enter Base Length (m) :");
+    bs = waitForInput().toFloat(); // will be rounded to 2 decimal degits
+    Serial.println("Enter Height Length (m)");
+    hg = waitForInput().toFloat(); // will be rounded to 2 decimal degits
+    Serial.println("Course Set for Right Triangle");
+    triangleMove(bs, hg, true);
+    break;
+  default:
+    Serial.println("Invalid Input");
+    return;
+  }
+}
+
+String waitForInput()
+{
+  int commPos = 0;        // Register used to keep track of the index of the command
+  char command[10] = {0}; // Array to store the incoming commands
+  String cmd = "";        // merge char cmd
+  int index;
+  for (index = 0; index < 10; index++) // Initialize the command array to NULL
+    command[index] = 0;
+  while (true)
+  {
+    if (Serial.available())
+    {
+      int commLen = Serial.readBytesUntil('\n', &command[0], 10); // Store the command in an array and store the length of the incoming command
+      for (index = 0; index < 10; index++)
+      {
+        // Echo the incoming command
+        Serial.print(command[index]);
+        cmd += command[index];
+      }
+
+      Serial.println();
+      return cmd;
+    }
+  }
 }
