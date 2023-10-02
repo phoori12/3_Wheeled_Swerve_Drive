@@ -393,6 +393,7 @@ void straightMove(float d)
   while (digitalRead(SW_Red) == 1)
     ;
   delay(1000);
+  bno055_read_euler_hrp(&myEulerData);
   float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
   gyro_offset = gyro_read;
   p2ptrack(0, d, 0);
@@ -413,6 +414,7 @@ void triangleMove(float b, float h, bool r)
   while (digitalRead(SW_Red) == 1)
     ;
   delay(1000);
+  bno055_read_euler_hrp(&myEulerData);
   float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
   gyro_offset = gyro_read;
   if (r)
@@ -460,6 +462,7 @@ void rectangleMove(float w, float h)
   while (digitalRead(SW_Red) == 1)
     ;
   delay(1000);
+  bno055_read_euler_hrp(&myEulerData);
   float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
   gyro_offset = gyro_read;
   p2ptrack(0, h, 0); // 1 2 0
@@ -491,6 +494,7 @@ void fullCircleMove(float r, bool lh)
   while (digitalRead(SW_Red) == 1)
     ;
   delay(1000);
+  bno055_read_euler_hrp(&myEulerData);
   float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
   gyro_offset = gyro_read;
   if (lh)
@@ -534,6 +538,7 @@ void halfCircleMove(float r, bool lh)
   while (digitalRead(SW_Red) == 1)
     ;
   delay(1000);
+  bno055_read_euler_hrp(&myEulerData);
   float gyro_read = mapDeg(float(myEulerData.h) / 16.00);
   gyro_offset = gyro_read;
   if (lh)
