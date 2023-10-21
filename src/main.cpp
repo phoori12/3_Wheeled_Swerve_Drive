@@ -165,7 +165,7 @@ float h_edit, h_error = 0, h_preverror = 0, h_p = 0, h_i = 0, h_d = 0;
 long p2pTargetTime = 0;
 ////////////////////////////////////////////////////////////
 
-#define MAX_SPD 10
+#define MAX_SPD 10 // MAX RPM 70
 
 union packed_int
 {
