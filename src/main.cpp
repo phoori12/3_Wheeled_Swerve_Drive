@@ -66,6 +66,7 @@ void ENCA3_Read();
 void ENCB3_Read();
 void sendCmd(float spd1, float spd2, float spd3);
 void headingControl(float spd, float course, float set_head);
+void rotationControl(float spd, float set_head);
 void moveWithDelay(float spd, float dir, float omega, int duration);
 void getRobotPosition();
 void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false);
@@ -161,8 +162,10 @@ float mapgyro;
 float d_i = 0;
 const float s_kp = 10.0f, s_ki = 0.20f, s_kd = 4.0f;
 const float h_kp = 2.50f, h_ki = 0.00f, h_kd = 1.25f; // PID Heading //
+const float r_kp = 2.50f, r_ki = 0.00f, r_kd = 1.25f; // PID Rotation //
 float dx, dy, dsm, s_error, d_s, s_edit, compensateTht;
 float h_edit, h_error = 0, h_preverror = 0, h_p = 0, h_i = 0, h_d = 0;
+float r_edit, r_error = 0, r_preverror = 0, r_p = 0, r_i = 0, r_d = 0;
 long p2pTargetTime = 0;
 ////////////////////////////////////////////////////////////
 
@@ -1624,6 +1627,25 @@ void headingControl(float spd, float course, float set_head)
   h_edit = h_p + h_d;
   Serial.println(gyro_pos);
   swerveDrive(spd, course, -h_edit, 0);
+}
+
+void rotationControl(float spd, float set_head)
+{
+  float gyro_pos = readGyro();
+  if (abs(gyro_pos) - set_head > gyro_accept)
+  {
+    r_error = gyro_pos - set_head;
+  }
+  else
+  {
+    r_error = 0;
+  }
+  r_p = r_kp * r_error;
+  r_d = (r_error - r_preverror) * r_kd;
+  r_preverror = r_error;
+  r_edit = r_p + r_d;
+  Serial.println(gyro_pos);
+  swerveDrive(spd, 0, -r_edit, 0);
 }
 
 void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float kd)
