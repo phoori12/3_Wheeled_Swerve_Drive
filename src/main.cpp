@@ -1747,6 +1747,11 @@ void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float k
 void getGraph()
 {
   // 1st kit
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
   tuneSwerveKit(1, 240, p_kp1, p_ki1, p_kd1); //
   while (digitalRead(SW_Bla) == 1)
   {
