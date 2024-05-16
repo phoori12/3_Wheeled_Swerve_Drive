@@ -66,6 +66,7 @@ void ENCA3_Read();
 void ENCB3_Read();
 void sendCmd(float spd1, float spd2, float spd3);
 void headingControl(float spd, float course, float set_head);
+void rotationControl(float spd, float set_head);
 void moveWithDelay(float spd, float dir, float omega, int duration);
 void getRobotPosition();
 void p2ptrack(float set_x, float set_y, float set_head, bool viaMode = false);
@@ -94,10 +95,11 @@ volatile long ENC3_Count = 0;
 // Degree Adjustor Position Control Variables //
 float pulsePerDeg = 11.377778;
 
-// PID Variables //
+// PID Variables // PID ชุดหมุน
 const float p_kp1 = 4.35f, p_ki1 = 0.05f, p_kd1 = 1.40f; // kp 8.00f
 const float p_kp2 = 7.45f, p_ki2 = 0.15f, p_kd2 = 1.32f;
 const float p_kp3 = 7.50f, p_ki3 = 0.03f, p_kd3 = 1.00f;
+////////////////////////////////
 
 float p_edit1, p_error1 = 0, p_preverror1 = 0, p_p1 = 0, p_i1 = 0, p_d1 = 0;
 float p_edit2, p_error2 = 0, p_preverror2 = 0, p_p2 = 0, p_i2 = 0, p_d2 = 0;
@@ -159,9 +161,11 @@ volatile float x_frame, y_frame, x_glob = 0, y_glob = 0;
 float mapgyro;
 float d_i = 0;
 const float s_kp = 10.0f, s_ki = 0.20f, s_kd = 4.0f;
-const float h_kp = 2.50f, h_ki = 0.00f, h_kd = 1.25f;
+const float h_kp = 2.50f, h_ki = 0.00f, h_kd = 1.25f; // PID Heading //
+const float r_kp = 2.50f, r_ki = 0.00f, r_kd = 1.25f; // PID Rotation //
 float dx, dy, dsm, s_error, d_s, s_edit, compensateTht;
 float h_edit, h_error = 0, h_preverror = 0, h_p = 0, h_i = 0, h_d = 0;
+float r_edit, r_error = 0, r_preverror = 0, r_p = 0, r_i = 0, r_d = 0;
 long p2pTargetTime = 0;
 ////////////////////////////////////////////////////////////
 
@@ -748,6 +752,7 @@ void getRobotPosition()
   x_glob += (x_frame * cos(degToRad(gyro_pos)) - y_frame * sin(degToRad(gyro_pos)));
   y_glob += (x_frame * sin(degToRad(gyro_pos)) + y_frame * cos(degToRad(gyro_pos)));
 
+  // Localize plot uncomment here // 
   Serial.print(x_glob);
   Serial.print(",");
   Serial.print(y_glob);
@@ -1626,6 +1631,25 @@ void headingControl(float spd, float course, float set_head)
   swerveDrive(spd, course, -h_edit, 0);
 }
 
+void rotationControl(float spd, float set_head)
+{
+  float gyro_pos = readGyro();
+  if (abs(gyro_pos) - set_head > gyro_accept)
+  {
+    r_error = gyro_pos - set_head;
+  }
+  else
+  {
+    r_error = 0;
+  }
+  r_p = r_kp * r_error;
+  r_d = (r_error - r_preverror) * r_kd;
+  r_preverror = r_error;
+  r_edit = r_p + r_d;
+  Serial.println(gyro_pos);
+  swerveDrive(spd, 0, -r_edit, 0);
+}
+
 void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float kd)
 {
 
@@ -1692,9 +1716,7 @@ void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float k
         }
       }
 
-      Serial.print(error);
-      Serial.print(",");
-      Serial.println(0);
+      Serial.println(error);
 
       p = kp * error;
       i += error;
@@ -1749,7 +1771,12 @@ void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float k
 void getGraph()
 {
   // 1st kit
-  tuneSwerveKit(1, 240, p_kp1, p_ki1, p_kd1);
+  while (digitalRead(SW_Bla) == 1)
+  {
+    stopAll2();
+  }
+  delay(1000);
+  tuneSwerveKit(1, 240, p_kp1, p_ki1, p_kd1); //
   while (digitalRead(SW_Bla) == 1)
   {
     stopAll2();
@@ -1761,7 +1788,7 @@ void getGraph()
     stopAll2();
   }
   delay(1000);
-  tuneSwerveKit(1, 240, p_kp1, 0, 0);
+  tuneSwerveKit(1, 240, p_kp1, 0, 0); //
   while (digitalRead(SW_Bla) == 1)
   {
     stopAll2();
@@ -1773,7 +1800,7 @@ void getGraph()
     stopAll2();
   }
   delay(1000);
-  tuneSwerveKit(1, 240, p_kp1, 0, p_kd1);
+  tuneSwerveKit(1, 240, p_kp1, 0, p_kd1); //
   while (digitalRead(SW_Bla) == 1)
   {
     stopAll2();
@@ -1787,7 +1814,7 @@ void getGraph()
   delay(1000);
   // 2nd kit
 
-  tuneSwerveKit(2, 240, p_kp1, p_ki1, p_kd1);
+  tuneSwerveKit(2, 240, p_kp1, p_ki1, p_kd1); //
   while (digitalRead(SW_Bla) == 1)
   {
     stopAll2();
@@ -1799,7 +1826,7 @@ void getGraph()
     stopAll2();
   }
   delay(1000);
-  tuneSwerveKit(2, 240, p_kp1, 0, 0);
+  tuneSwerveKit(2, 240, p_kp1, 0, 0); //
   while (digitalRead(SW_Bla) == 1)
   {
     stopAll2();
@@ -1811,7 +1838,7 @@ void getGraph()
     stopAll2();
   }
   delay(1000);
-  tuneSwerveKit(2, 240, p_kp1, 0, p_kd1);
+  tuneSwerveKit(2, 240, p_kp1, 0, p_kd1); //
   while (digitalRead(SW_Bla) == 1)
   {
     stopAll2();
@@ -1825,7 +1852,7 @@ void getGraph()
   delay(1000);
 
   // 3rd kit
-  tuneSwerveKit(3, 240, p_kp1, p_ki1, p_kd1);
+  tuneSwerveKit(3, 240, p_kp1, p_ki1, p_kd1); //
   while (digitalRead(SW_Bla) == 1)
   {
     stopAll2();
@@ -1837,7 +1864,7 @@ void getGraph()
     stopAll2();
   }
   delay(1000);
-  tuneSwerveKit(3, 240, p_kp1, 0, 0);
+  tuneSwerveKit(3, 240, p_kp1, 0, 0); //
   while (digitalRead(SW_Bla) == 1)
   {
     stopAll2();
@@ -1849,7 +1876,7 @@ void getGraph()
     stopAll2();
   }
   delay(1000);
-  tuneSwerveKit(3, 240, p_kp1, 0, p_kd1);
+  tuneSwerveKit(3, 240, p_kp1, 0, p_kd1); //
   while (digitalRead(SW_Bla) == 1)
   {
     stopAll2();
