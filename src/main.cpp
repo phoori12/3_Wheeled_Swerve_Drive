@@ -165,7 +165,7 @@ float h_edit, h_error = 0, h_preverror = 0, h_p = 0, h_i = 0, h_d = 0;
 long p2pTargetTime = 0;
 ////////////////////////////////////////////////////////////
 
-#define MAX_SPD 10 // MAX RPM 70
+#define MAX_SPD 70 // MAX RPM 70 65 58 50 43 36 29 22 15 8
 
 union packed_int
 {
@@ -349,6 +349,7 @@ long lasttime_shit = 0;
 
 uint32_t localizeTime = 0;
 bool safeMode = true;
+
 void loop()
 {
   Serial.println("1. Straight Path");
@@ -386,6 +387,7 @@ void loop()
     stopAll2();
   }
 }
+
 void straightMove(float d)
 {
   setDegSwerve(90, 90, 90, 0, 0, 0);
@@ -422,33 +424,33 @@ void triangleMove(float b, float h, bool r)
     p2ptrack(0, h, 0); // 1 2 0
     stopAll2();
     delay(500);
-    while (digitalRead(SW_Red) == 1)
-      ;
-    delay(1000);
+    // while (digitalRead(SW_Red) == 1)
+    //   ;
+    // delay(1000);
     p2ptrack(b, 0, 0); // 2 0 0
     stopAll2();
     delay(500);
-    while (digitalRead(SW_Red) == 1)
-      ;
-    delay(1000);
+    // while (digitalRead(SW_Red) == 1)
+    //   ;
+    // delay(1000);
     p2ptrack(0, 0, 0);
     stopAll2();
-    delay(500);
+    // delay(500);
   }
   else
   {
     p2ptrack(b, 0, 0); // 1 2 0
     stopAll2();
     delay(500);
-    while (digitalRead(SW_Red) == 1)
-      ;
-    delay(1000);
+    // while (digitalRead(SW_Red) == 1)
+    //   ;
+    // delay(1000);
     p2ptrack(b / 2, h, 0); // 2 0 0
     stopAll2();
     delay(500);
-    while (digitalRead(SW_Red) == 1)
-      ;
-    delay(1000);
+    // while (digitalRead(SW_Red) == 1)
+    //   ;
+    // delay(1000);
     p2ptrack(0, 0, 0);
     stopAll2();
     delay(500);
@@ -468,21 +470,21 @@ void rectangleMove(float w, float h)
   p2ptrack(0, h, 0); // 1 2 0
   stopAll2();
   delay(500);
-  while (digitalRead(SW_Red) == 1)
-    ;
-  delay(1000);
+  // while (digitalRead(SW_Red) == 1)
+  //   ;
+  // delay(1000);
   p2ptrack(w, h, 0); // 2 0 0
   stopAll2();
   delay(500);
-  while (digitalRead(SW_Red) == 1)
-    ;
-  delay(1000);
+  // while (digitalRead(SW_Red) == 1)
+  //   ;
+  // delay(1000);
   p2ptrack(w, 0, 0);
   stopAll2();
   delay(500);
-  while (digitalRead(SW_Red) == 1)
-    ;
-  delay(1000);
+  // while (digitalRead(SW_Red) == 1)
+  //   ;
+  // delay(1000);
   p2ptrack(0, 0, 0);
   stopAll2();
 }
@@ -753,7 +755,7 @@ void getRobotPosition()
   Serial.println(gyro_pos);
 }
 
-void moveWithDelay(float spd, float dir, float head, int duration)
+void moveWithDelay(float spd, float dir, float head, int duration) //note
 {
   // TODO
 }
@@ -980,17 +982,17 @@ void priorityDegPosCon(int pulse1, int pulse2, int pulse3)
   }
 }
 
-float degToRad(float val)
+float degToRad(float val) //note
 {
   return val * DEG_TO_RAD;
 }
 
-float radToDeg(float val)
+float radToDeg(float val) //note
 {
   return val * RAD_TO_DEG;
 }
 
-void stopAll2()
+void stopAll2() //note
 {
   spin_drive(1, 0);
   spin_drive(2, 0);
@@ -1099,13 +1101,13 @@ void degAdj3_posCon()
   }
 }
 
-float closestAngle(float a, float b)
+float closestAngle(float a, float b) //note
 {
   float dir = fmod(b, 360) - fmod(a, 360);
   return mapDeg(dir);
 }
 
-float mapDeg(float deg)
+float mapDeg(float deg) // note
 {
   if (abs(deg) > 180.0f)
   {
@@ -1288,7 +1290,7 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
   // Serial.println(deg1);
 }
 
-void spinCCW()
+void spinCCW() //note
 {
   spin_drive(1, -400);
   spin_drive(2, -400);
@@ -1339,7 +1341,7 @@ void homeTheta()
   delay(100);
 }
 
-void stopAll()
+void stopAll() //note
 {
   while (1)
   {
@@ -1428,7 +1430,7 @@ void spin_drive(int mtr, int spd)
   }
 }
 
-void ENCA1_Read()
+void ENCA1_Read() //note
 {
   if (digitalRead(encB1) == LOW)
   {
@@ -1441,7 +1443,7 @@ void ENCA1_Read()
   // Serial.println(ENCL_Count);
 }
 
-void ENCB1_Read()
+void ENCB1_Read() //note
 {
   if (digitalRead(encA1) == LOW)
   {
@@ -1453,7 +1455,7 @@ void ENCB1_Read()
   }
 }
 
-void ENCA2_Read()
+void ENCA2_Read() //note
 {
   if (digitalRead(encB2) == LOW)
   {
@@ -1466,7 +1468,7 @@ void ENCA2_Read()
   // Serial.println(ENCL_Count);
 }
 
-void ENCB2_Read()
+void ENCB2_Read() //note
 {
   if (digitalRead(encA2) == LOW)
   {
@@ -1478,7 +1480,7 @@ void ENCB2_Read()
   }
 }
 
-void ENCA3_Read()
+void ENCA3_Read() //note
 {
   if (digitalRead(encB3) == LOW)
   {
@@ -1491,7 +1493,7 @@ void ENCA3_Read()
   // Serial.println(ENCL_Count);
 }
 
-void ENCB3_Read()
+void ENCB3_Read() //note
 {
   if (digitalRead(encA3) == LOW)
   {
@@ -1519,7 +1521,7 @@ void sendCmd(float spd1, float spd2, float spd3)
   }
 }
 
-volatile long int fromSerial(volatile byte packet[])
+volatile long int fromSerial(volatile byte packet[]) //note
 {
   num_rec.b[0] = packet[5];
   num_rec.b[1] = packet[4];
@@ -1529,7 +1531,7 @@ volatile long int fromSerial(volatile byte packet[])
   return out;
 }
 
-void serialEvent5() // m1
+void serialEvent5() // m1 //note
 {
   while (Serial5.available())
   {
@@ -1550,7 +1552,7 @@ void serialEvent5() // m1
   }
 }
 
-void serialEvent4() // m2
+void serialEvent4() // m2 //note
 {
   while (Serial4.available())
   {
@@ -1571,7 +1573,7 @@ void serialEvent4() // m2
   }
 }
 
-void serialEvent3() // m3
+void serialEvent3() // m3 //note
 {
   while (Serial3.available())
   {
@@ -1592,7 +1594,7 @@ void serialEvent3() // m3
   }
 }
 
-float readGyro()
+float readGyro() //note
 {
   if ((millis() - lastTime_gyroRead) >= 10) // To stream at 10 Hz without using additional timers
   {
@@ -1966,7 +1968,7 @@ void triangleCmdExec()
   }
 }
 
-String waitForInput()
+String waitForInput() //note
 {
   int commPos = 0;        // Register used to keep track of the index of the command
   char command[10] = {0}; // Array to store the incoming commands
