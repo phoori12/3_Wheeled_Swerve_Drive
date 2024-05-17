@@ -859,7 +859,7 @@ void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false)
 
     if (rotateOnly)
     {
-      // priorityDegPosCon(thet1, thet2, thet3);
+      setDegSwerve(45, 45, 45, vw1, vw2, vw3);
     }
     else
     {
@@ -1645,7 +1645,7 @@ void rotationControl(float spd, float set_head)
   r_preverror = r_error;
   r_edit = r_p + r_d;
   Serial.println(gyro_pos);
-  swerveDrive(spd, 0, -r_edit, 0);
+  swerveDrive(spd, 0, -r_edit, 1);
 }
 
 void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float kd)
