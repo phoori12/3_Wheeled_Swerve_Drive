@@ -40,7 +40,7 @@ struct bno055_euler myEulerData; // Structure to hold the Euler data
 unsigned long lastTime_gyroRead = 0;
 float gyro_now = 0;
 
-float gyro_accept = 0.50f;
+float gyro_accept = 0.4f; //0.5f
 float gyro_offset = 0.00f;
 float gyro_localizeMargin = 3.00f;
 
@@ -96,7 +96,7 @@ volatile long ENC3_Count = 0;
 float pulsePerDeg = 11.377778;
 
 // PID Variables // PID ชุดหมุน
-const float p_kp1 = 4.35f, p_ki1 = 0.05f, p_kd1 = 1.40f; // kp 8.00f
+const float p_kp1 = 7.35f, p_ki1 = 0.05f, p_kd1 = 1.40f; // kp 8.00f
 const float p_kp2 = 7.45f, p_ki2 = 0.15f, p_kd2 = 1.32f;
 const float p_kp3 = 7.50f, p_ki3 = 0.03f, p_kd3 = 1.00f;
 ////////////////////////////////
@@ -169,7 +169,7 @@ float r_edit, r_error = 0, r_preverror = 0, r_p = 0, r_i = 0, r_d = 0;
 long p2pTargetTime = 0;
 ////////////////////////////////////////////////////////////
 
-#define MAX_SPD 70 // MAX RPM 70 65 58 50 43 36 29 22 15 8
+#define MAX_SPD 10 // MAX RPM 70
 
 union packed_int
 {
@@ -354,44 +354,78 @@ long lasttime_shit = 0;
 uint32_t localizeTime = 0;
 bool safeMode = true;
 
+// testing heading
+float set_head_values[] = {15, 30, 45, 60, 75, 90}; 
+int num_values = sizeof(set_head_values) / sizeof(set_head_values[0]);
+bool programStarted = false; 
+int targetIndex = 0;
+
 void loop()
 {
-  Serial.println("1. Straight Path");
-  Serial.println("2. Triangle");
-  Serial.println("3. Rectangle / Square");
-  Serial.println("4. Circular");
-  String cmd = waitForInput();
-
-  switch (cmd.toInt())
+  while (digitalRead(SW_Bla) == 1)
   {
-  case 1:
-    straightCmdExec();
-    break;
-  case 2:
-    triangleCmdExec();
-    break;
-  case 3:
-    rectangleCmdExec();
-    break;
-  case 4:
-    circularCmdExec();
-    break;
-  default:
-    Serial.println("Invalid Input");
-    return;
-  }
-
-  Serial.println("CMD Completed");
-
-  // setDegSwerve(0, 0, 0, 0, 0, 0);
-  // delay(1000);
-  while (1)
-  {
-    stopFlag = true;
     stopAll2();
   }
+  tuneSwerveKit(1, 90, 2, 0, 0); 
+  
+
+  // Serial.println("1. Straight Path");
+  // Serial.println("2. Triangle");
+  // Serial.println("3. Rectangle / Square");
+  // Serial.println("4. Circular");
+  // String cmd = waitForInput();
+
+  // switch (cmd.toInt())
+  // {
+  // case 1:
+  //   straightCmdExec();
+  //   break;
+  // case 2:
+  //   triangleCmdExec();
+  //   break;
+  // case 3:
+  //   rectangleCmdExec();
+  //   break;
+  // case 4:
+  //   circularCmdExec();
+  //   break;
+  // default:
+  //   Serial.println("Invalid Input");
+  //   return;
+  // }
+
+  // Serial.println("CMD Completed");
+
+  // // setDegSwerve(0, 0, 0, 0, 0, 0);
+  // // delay(1000);
+  // while (1)
+  // {
+  //   stopFlag = true;
+  //   stopAll2();
+  // }
 }
 
+void testheading()
+{
+  if (digitalRead(SW_Bla) == 0) {
+    programStarted = true; // Set the flag to start the program
+    //Serial.println("In");
+  }
+
+  // Run the program if the switch is pressed
+  if (programStarted == true) {
+    if (targetIndex < num_values) {
+      rotationControl(10, set_head_values[targetIndex]);
+      //Serial.print("Target ");
+      //Serial.println(set_head_values[targetIndex]);
+    } else {
+      Serial.println("All targets reached");
+      programStarted = false; // Optionally reset the flag to stop the program
+      // Reset targetIndex to 0 if you want to restart the sequence on next switch press
+      targetIndex = 0;
+    }
+  }
+}
 void straightMove(float d)
 {
   setDegSwerve(90, 90, 90, 0, 0, 0);
@@ -428,33 +462,33 @@ void triangleMove(float b, float h, bool r)
     p2ptrack(0, h, 0); // 1 2 0
     stopAll2();
     delay(500);
-    // while (digitalRead(SW_Red) == 1)
-    //   ;
-    // delay(1000);
+    while (digitalRead(SW_Red) == 1)
+      ;
+    delay(1000);
     p2ptrack(b, 0, 0); // 2 0 0
     stopAll2();
     delay(500);
-    // while (digitalRead(SW_Red) == 1)
-    //   ;
-    // delay(1000);
+    while (digitalRead(SW_Red) == 1)
+      ;
+    delay(1000);
     p2ptrack(0, 0, 0);
     stopAll2();
-    // delay(500);
+    delay(500);
   }
   else
   {
     p2ptrack(b, 0, 0); // 1 2 0
     stopAll2();
     delay(500);
-    // while (digitalRead(SW_Red) == 1)
-    //   ;
-    // delay(1000);
+    while (digitalRead(SW_Red) == 1)
+      ;
+    delay(1000);
     p2ptrack(b / 2, h, 0); // 2 0 0
     stopAll2();
     delay(500);
-    // while (digitalRead(SW_Red) == 1)
-    //   ;
-    // delay(1000);
+    while (digitalRead(SW_Red) == 1)
+      ;
+    delay(1000);
     p2ptrack(0, 0, 0);
     stopAll2();
     delay(500);
@@ -474,21 +508,21 @@ void rectangleMove(float w, float h)
   p2ptrack(0, h, 0); // 1 2 0
   stopAll2();
   delay(500);
-  // while (digitalRead(SW_Red) == 1)
-  //   ;
-  // delay(1000);
+  while (digitalRead(SW_Red) == 1)
+    ;
+  delay(1000);
   p2ptrack(w, h, 0); // 2 0 0
   stopAll2();
   delay(500);
-  // while (digitalRead(SW_Red) == 1)
-  //   ;
-  // delay(1000);
+  while (digitalRead(SW_Red) == 1)
+    ;
+  delay(1000);
   p2ptrack(w, 0, 0);
   stopAll2();
   delay(500);
-  // while (digitalRead(SW_Red) == 1)
-  //   ;
-  // delay(1000);
+  while (digitalRead(SW_Red) == 1)
+    ;
+  delay(1000);
   p2ptrack(0, 0, 0);
   stopAll2();
 }
@@ -760,7 +794,7 @@ void getRobotPosition()
   Serial.println(gyro_pos);
 }
 
-void moveWithDelay(float spd, float dir, float head, int duration) //note
+void moveWithDelay(float spd, float dir, float head, int duration)
 {
   // TODO
 }
@@ -861,7 +895,7 @@ void swerveDrive(float spd, float dir, float omega, bool rotateOnly = false)
 
     if (rotateOnly)
     {
-      // priorityDegPosCon(thet1, thet2, thet3);
+      setDegSwerve(0, 45, 135, vw1, vw2, vw3);
     }
     else
     {
@@ -987,17 +1021,17 @@ void priorityDegPosCon(int pulse1, int pulse2, int pulse3)
   }
 }
 
-float degToRad(float val) //note
+float degToRad(float val)
 {
   return val * DEG_TO_RAD;
 }
 
-float radToDeg(float val) //note
+float radToDeg(float val)
 {
   return val * RAD_TO_DEG;
 }
 
-void stopAll2() //note
+void stopAll2()
 {
   spin_drive(1, 0);
   spin_drive(2, 0);
@@ -1106,13 +1140,13 @@ void degAdj3_posCon()
   }
 }
 
-float closestAngle(float a, float b) //note
+float closestAngle(float a, float b)
 {
   float dir = fmod(b, 360) - fmod(a, 360);
   return mapDeg(dir);
 }
 
-float mapDeg(float deg) // note
+float mapDeg(float deg)
 {
   if (abs(deg) > 180.0f)
   {
@@ -1295,7 +1329,7 @@ void setDegSwerve(float deg1, float deg2, float deg3, float v1, float v2, float 
   // Serial.println(deg1);
 }
 
-void spinCCW() //note
+void spinCCW()
 {
   spin_drive(1, -400);
   spin_drive(2, -400);
@@ -1346,7 +1380,7 @@ void homeTheta()
   delay(100);
 }
 
-void stopAll() //note
+void stopAll()
 {
   while (1)
   {
@@ -1435,7 +1469,7 @@ void spin_drive(int mtr, int spd)
   }
 }
 
-void ENCA1_Read() //note
+void ENCA1_Read()
 {
   if (digitalRead(encB1) == LOW)
   {
@@ -1448,7 +1482,7 @@ void ENCA1_Read() //note
   // Serial.println(ENCL_Count);
 }
 
-void ENCB1_Read() //note
+void ENCB1_Read()
 {
   if (digitalRead(encA1) == LOW)
   {
@@ -1460,7 +1494,7 @@ void ENCB1_Read() //note
   }
 }
 
-void ENCA2_Read() //note
+void ENCA2_Read()
 {
   if (digitalRead(encB2) == LOW)
   {
@@ -1473,7 +1507,7 @@ void ENCA2_Read() //note
   // Serial.println(ENCL_Count);
 }
 
-void ENCB2_Read() //note
+void ENCB2_Read()
 {
   if (digitalRead(encA2) == LOW)
   {
@@ -1485,7 +1519,7 @@ void ENCB2_Read() //note
   }
 }
 
-void ENCA3_Read() //note
+void ENCA3_Read()
 {
   if (digitalRead(encB3) == LOW)
   {
@@ -1498,7 +1532,7 @@ void ENCA3_Read() //note
   // Serial.println(ENCL_Count);
 }
 
-void ENCB3_Read() //note
+void ENCB3_Read()
 {
   if (digitalRead(encA3) == LOW)
   {
@@ -1526,7 +1560,7 @@ void sendCmd(float spd1, float spd2, float spd3)
   }
 }
 
-volatile long int fromSerial(volatile byte packet[]) //note
+volatile long int fromSerial(volatile byte packet[])
 {
   num_rec.b[0] = packet[5];
   num_rec.b[1] = packet[4];
@@ -1536,7 +1570,7 @@ volatile long int fromSerial(volatile byte packet[]) //note
   return out;
 }
 
-void serialEvent5() // m1 //note
+void serialEvent5() // m1
 {
   while (Serial5.available())
   {
@@ -1557,7 +1591,7 @@ void serialEvent5() // m1 //note
   }
 }
 
-void serialEvent4() // m2 //note
+void serialEvent4() // m2
 {
   while (Serial4.available())
   {
@@ -1578,7 +1612,7 @@ void serialEvent4() // m2 //note
   }
 }
 
-void serialEvent3() // m3 //note
+void serialEvent3() // m3
 {
   while (Serial3.available())
   {
@@ -1599,7 +1633,7 @@ void serialEvent3() // m3 //note
   }
 }
 
-float readGyro() //note
+float readGyro()
 {
   if ((millis() - lastTime_gyroRead) >= 10) // To stream at 10 Hz without using additional timers
   {
@@ -1615,7 +1649,7 @@ float readGyro() //note
 void headingControl(float spd, float course, float set_head)
 {
   float gyro_pos = readGyro();
-  if (abs(gyro_pos) - set_head > gyro_accept)
+  if (abs(gyro_pos - set_head) > gyro_accept)
   {
     h_error = gyro_pos - set_head;
   }
@@ -1630,25 +1664,90 @@ void headingControl(float spd, float course, float set_head)
   Serial.println(gyro_pos);
   swerveDrive(spd, course, -h_edit, 0);
 }
-
-void rotationControl(float spd, float set_head)
+void rotationControl(float spd, float set_head) 
 {
   float gyro_pos = readGyro();
-  if (abs(gyro_pos) - set_head > gyro_accept)
-  {
+  //Serial.println(gyro_pos);
+
+  if (abs(gyro_pos - set_head) > gyro_accept) {
     r_error = gyro_pos - set_head;
-  }
-  else
-  {
+    //Serial.print("r_error = ");
+    //Serial.println(r_error);
+  } 
+  else {
     r_error = 0;
   }
   r_p = r_kp * r_error;
   r_d = (r_error - r_preverror) * r_kd;
   r_preverror = r_error;
   r_edit = r_p + r_d;
+  // Serial.println(r_edit);
+  if (r_edit > 0) {
+    r_edit = spd;
+    //Serial.println("+spd");
+  }
+  if (r_edit < 0) {
+    r_edit = -spd;
+    //Serial.println("-spd");
+  }
+  if (gyro_pos == set_head) {
+    stopAll2();
+    //r_edit = 0;
+    // Move to the next target
+    Serial.print("Finish ");
+    Serial.println(set_head);
+    while (digitalRead(SW_Bla) == 1)
+    {
+      /* code */
+    }
+    targetIndex++ ;
+    if (targetIndex >= num_values) {
+      Serial.println("All targets reached");
+    }
+  }
+
   Serial.println(gyro_pos);
-  swerveDrive(spd, 0, -r_edit, 0);
+  setDegSwerve(0, 45, 135, -r_edit, r_edit, -r_edit);
 }
+
+// void rotationControl(float spd, float set_head)
+// {
+//   float gyro_pos = readGyro();
+//   Serial.println(gyro_pos);
+//   if (abs(gyro_pos - set_head ) > gyro_accept)
+//   {
+//     r_error = gyro_pos - set_head;
+//     Serial.print("r_error = ");
+//     Serial.println(r_error);
+//   }
+//   else
+//   {
+//     r_error = 0;
+//   }
+//   r_p = r_kp * r_error;
+//   r_d = (r_error - r_preverror) * r_kd;
+//   r_preverror = r_error;
+//   r_edit = r_p + r_d;
+//   //Serial.println(r_edit);
+//   if (r_edit > 0) 
+//   {
+//     r_edit = spd;
+//     Serial.println("+spd");
+//   }
+//   if (r_edit < 0) 
+//   {
+//     r_edit = -spd;
+//     Serial.println("-spd");
+//   }
+//   if (gyro_pos == set_head)
+//   {
+//     r_edit = 0;
+    
+//   }
+  
+//   Serial.println(gyro_pos);
+//   setDegSwerve(0, 45, 135, -r_edit, r_edit, -r_edit);
+// }
 
 void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float kd)
 {
@@ -1715,11 +1814,14 @@ void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float k
           error = 0;
         }
       }
-
-      Serial.println(error);
+      
+      Serial.print(setpoint_deg);
+      Serial.print(",");
+      Serial.println(degToPulseConst_1);
+      
 
       p = kp * error;
-      i += error;
+      i += error; 
       i = constrain(i, -2046, 2046);
       d = (error - preverror) * kd;
       preverror = error;
@@ -1995,7 +2097,7 @@ void triangleCmdExec()
   }
 }
 
-String waitForInput() //note
+String waitForInput()
 {
   int commPos = 0;        // Register used to keep track of the index of the command
   char command[10] = {0}; // Array to store the incoming commands
