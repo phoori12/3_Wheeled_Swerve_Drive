@@ -1820,13 +1820,13 @@ void tuneSwerveKit(int swerveNo, float setpoint_deg, float kp, float ki, float k
 
       if (swerveNo == 1) {
         float deg = - (swerve_deg1 - swerve_off1) / degToPulseConst_1;
-        Serial.println(degToPulseConst_1);
+        Serial.println(deg);
       } else if (swerveNo == 2) {
         float deg = - (swerve_deg2 - swerve_off2) / degToPulseConst_2;
-        Serial.println(degToPulseConst_2);
+        Serial.println(deg);
       } else {
         float deg = - (swerve_deg3 - swerve_off3) / degToPulseConst_3;
-        Serial.println(degToPulseConst_3);
+        Serial.println(deg);
       }
      
       //  swerve_deg1 = swerve_off1 - (deg1 * degToPulseConst_1);
